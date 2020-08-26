@@ -10,8 +10,8 @@
     <!-- Code Authors -->
     <author email="pgeneva@udel.edu">Patrick Geneva</author>
     <author email="keck@udel.edu">Kevin Eckenhoff</author>
-    <maintainer email="pgeneva@udel.edu">Patrick Geneva</maintainer>
-    <maintainer email="keck@udel.edu">Kevin Eckenhoff</maintainer>
+    <maintainer email="gzhou@anybotics.com">Guoxiang Zhou</maintainer>
+    <maintainer email="ynava@anybotics.com">Yoshua Nava</maintainer>
 
     <!-- Licensing -->
     <license>GNU General Public License v3.0</license>
