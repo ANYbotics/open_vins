@@ -28,13 +28,13 @@
 #include <Eigen/StdVector>
 #include <boost/filesystem.hpp>
 
-#include "track/TrackAruco.h"
-#include "track/TrackDescriptor.h"
-#include "track/TrackKLT.h"
-#include "track/TrackSIM.h"
-#include "init/InertialInitializer.h"
-#include "types/LandmarkRepresentation.h"
-#include "types/Landmark.h"
+#include <ov_core/track/TrackAruco.h>
+#include <ov_core/track/TrackDescriptor.h>
+#include <ov_core/track/TrackKLT.h>
+#include <ov_core/track/TrackSIM.h>
+#include <ov_core/init/InertialInitializer.h>
+#include <ov_core/types/LandmarkRepresentation.h>
+#include <ov_core/types/Landmark.h>
 
 #include "state/Propagator.h"
 #include "state/State.h"
@@ -77,6 +77,13 @@ namespace ov_msckf {
          * @param am Linear acceleration
          */
         void feed_measurement_imu(double timestamp, Eigen::Vector3d wm, Eigen::Vector3d am);
+
+        /**
+         * @brief Feed function for feet contact data
+         * @param timestamp Time of the feet contact measurement
+         * @param is_in_contact Whether the agent is in contact or not
+         */
+        void feed_measurement_contact(double timestamp, bool is_in_contact);
 
 
         /**

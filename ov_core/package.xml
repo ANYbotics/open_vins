@@ -1,16 +1,15 @@
 <?xml version="1.0"?>
-<package>
+<package format="2">
     <!-- Package Information -->
     <name>ov_core</name>
     <version>1.0.0</version>
-    <description>
-        Core algorithms for visual-inertial navigation algorithms.
-    </description>
+    <description>Core algorithms for visual-inertial navigation algorithms.</description>
 
     <!-- Code Authors -->
     <author email="pgeneva@udel.edu">Patrick Geneva</author>
     <author email="keck@udel.edu">Kevin Eckenhoff</author>
-    <maintainer email="pgeneva@udel.edu">Patrick Geneva</maintainer>
+    <maintainer email="gzhou@anybotics.com">Guoxiang Zhou</maintainer>
+    <maintainer email="ynava@anybotics.com">Yoshua Nava</maintainer>
 
     <!-- Licensing -->
     <license>GNU General Public License v3.0</license>
@@ -31,15 +30,21 @@
     <build_depend>cv_bridge</build_depend>
 
     <!-- Dependencies needed after this package is compiled. -->
-    <run_depend>roscpp</run_depend>
-    <run_depend>rosbag</run_depend>
-    <run_depend>tf</run_depend>
-    <run_depend>std_msgs</run_depend>
-    <run_depend>geometry_msgs</run_depend>
-    <run_depend>sensor_msgs</run_depend>
-    <run_depend>nav_msgs</run_depend>
-    <run_depend>visualization_msgs</run_depend>
-    <run_depend>cv_bridge</run_depend>
+    <exec_depend>roscpp</exec_depend>
+    <exec_depend>rosbag</exec_depend>
+    <exec_depend>tf</exec_depend>
+    <exec_depend>std_msgs</exec_depend>
+    <exec_depend>geometry_msgs</exec_depend>
+    <exec_depend>sensor_msgs</exec_depend>
+    <exec_depend>nav_msgs</exec_depend>
+    <exec_depend>visualization_msgs</exec_depend>
+    <exec_depend>cv_bridge</exec_depend>
 
+    <depend>eigen</depend>
+    <depend>boost</depend>
+    <depend>libopencv-dev</depend>
+
+<!--     <test_depend>cmake_code_coverage</test_depend> -->
+    <test_depend>gtest</test_depend>
 
 </package>

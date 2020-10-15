@@ -31,13 +31,13 @@
 #include <Eigen/Eigen>
 #include <Eigen/StdVector>
 
-#include <opencv/cv.hpp>
+#include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
 
 
 #include "core/VioManagerOptions.h"
-#include "sim/BsplineSE3.h"
-#include "utils/colors.h"
+#include <ov_core/sim/BsplineSE3.h>
+#include <ov_core/utils/colors.h>
 
 
 using namespace ov_core;

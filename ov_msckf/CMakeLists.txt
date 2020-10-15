@@ -1,131 +1,283 @@
-cmake_minimum_required(VERSION 2.8.8)
+cmake_minimum_required(VERSION 3.5.1)
 
 # Project name
 project(ov_msckf)
 
-# Include our cmake files
-#set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/)
+set(CMAKE_CXX_STANDARD 11)
+add_compile_options(-Wall -Wextra -Wpedantic)
+
+## Export compile commands for clang.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+## Create a list of catkin package dependencies used in header files of this package.
+set(CATKIN_PACKAGE_HEADER_DEPENDENCIES
+  cv_bridge
+  geometry_msgs
+  nav_msgs
+  ov_core
+  param_io
+  rosbag
+  roscpp
+  sensor_msgs
+  signal_logger_msgs
+  std_msgs
+  tf
+  visualization_msgs
+)
+
+## Create a list of catkin package dependencies, now for both header and source files.
+set(CATKIN_PACKAGE_DEPENDENCIES
+  ${CATKIN_PACKAGE_HEADER_DEPENDENCIES}
+)
 
 # Find catkin (the ROS build system)
-find_package(catkin QUIET COMPONENTS roscpp rosbag tf std_msgs geometry_msgs sensor_msgs nav_msgs visualization_msgs cv_bridge ov_core)
+find_package(catkin REQUIRED
+  COMPONENTS
+    ${CATKIN_PACKAGE_DEPENDENCIES}
+)
 
-# Include libraries
 find_package(Eigen3 REQUIRED)
-find_package(OpenCV 3 REQUIRED)
+find_package(OpenCV 4 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system filesystem thread date_time)
 
-# display message to user
-message(STATUS "EIGEN VERSION: " ${EIGEN3_VERSION})
-message(STATUS "OPENCV VERSION: " ${OpenCV_VERSION})
-message(STATUS "BOOST VERSION: " ${Boost_VERSION})
+## The catkin_package macro generates cmake config files for your package.
+catkin_package(
+  INCLUDE_DIRS
+    src
+    ${EIGEN3_INCLUDE_DIR}
+  LIBRARIES
+    ${PROJECT_NAME}
+  CATKIN_DEPENDS
+    ${CATKIN_PACKAGE_HEADER_DEPENDENCIES}
+  DEPENDS
+    Boost
+    OpenCV
+)
 
-# Describe catkin project
-if (catkin_FOUND)
-    add_definitions(-DROS_AVAILABLE=1)
-    catkin_package(
-            CATKIN_DEPENDS roscpp rosbag tf std_msgs geometry_msgs sensor_msgs nav_msgs visualization_msgs cv_bridge ov_core
-            INCLUDE_DIRS src
-            LIBRARIES ov_msckf_lib
+
+add_library(${PROJECT_NAME}
+  src/sim/Simulator.cpp
+  src/state/State.cpp
+  src/state/StateHelper.cpp
+  src/state/Propagator.cpp
+  src/core/VioManager.cpp
+  src/core/RosVisualizer.cpp
+  src/update/UpdaterHelper.cpp
+  src/update/UpdaterMSCKF.cpp
+  src/update/UpdaterSLAM.cpp
+  src/update/UpdaterZeroVelocity.cpp
+)
+
+add_dependencies(${PROJECT_NAME}
+  ${catkin_EXPORTED_TARGETS}
+)
+
+# Specify your packages header files.
+target_include_directories(${PROJECT_NAME} PRIVATE
+  src
+)
+
+target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
+  ${catkin_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+  ${OPENCV_INCLUDE_DIRS}
+)
+
+target_link_libraries(${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+# Add executable
+add_executable(run_serial_msckf
+  src/ros_serial_msckf.cpp
+)
+
+add_dependencies(run_serial_msckf
+  ${catkin_EXPORTED_TARGETS}
+)
+
+target_include_directories(run_serial_msckf PRIVATE
+  src
+)
+
+target_include_directories(run_serial_msckf SYSTEM PUBLIC
+  ${catkin_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+  ${OPENCV_INCLUDE_DIRS}
+)
+
+target_link_libraries(run_serial_msckf
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+# Add executable
+add_executable(run_subscribe_msckf
+  src/ros_subscribe_msckf.cpp
+)
+
+add_dependencies(run_subscribe_msckf
+  ${catkin_EXPORTED_TARGETS}
+)
+
+target_include_directories(run_subscribe_msckf PRIVATE
+  src
+)
+
+target_include_directories(run_subscribe_msckf SYSTEM PUBLIC
+  ${catkin_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+  ${OPENCV_INCLUDE_DIRS}
+)
+
+target_link_libraries(run_subscribe_msckf
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+
+# Add executable
+add_executable(run_simulation
+  src/run_simulation.cpp
+)
+
+add_dependencies(run_simulation
+  ${catkin_EXPORTED_TARGETS}
+)
+
+target_include_directories(run_simulation PRIVATE
+  src
+)
+
+target_include_directories(run_simulation SYSTEM PUBLIC
+  ${catkin_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+  ${OPENCV_INCLUDE_DIRS}
+)
+
+target_link_libraries(run_simulation
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+# Add executable
+add_executable(test_sim_meas
+  src/test_sim_meas.cpp
+)
+
+add_dependencies(test_sim_meas
+  ${catkin_EXPORTED_TARGETS}
+)
+
+target_include_directories(test_sim_meas PRIVATE
+  src
+)
+
+target_include_directories(test_sim_meas SYSTEM PUBLIC
+  ${catkin_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+  ${OPENCV_INCLUDE_DIRS}
+)
+
+target_link_libraries(test_sim_meas
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+# Add executable
+add_executable(test_sim_repeat
+  src/test_sim_repeat.cpp
+)
+
+add_dependencies(test_sim_repeat
+  ${catkin_EXPORTED_TARGETS}
+)
+
+target_include_directories(test_sim_repeat PRIVATE
+  src
+)
+
+target_include_directories(test_sim_repeat SYSTEM PUBLIC
+  ${catkin_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+  ${OPENCV_INCLUDE_DIRS}
+)
+
+target_link_libraries(test_sim_repeat
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+# Installation
+install(
+  TARGETS
+    ${PROJECT_NAME}
+    run_serial_msckf
+    run_subscribe_msckf
+    run_simulation
+    test_sim_meas
+    test_sim_repeat
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(
+  DIRECTORY
+    launch
+    scripts
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+##########
+## Test ##
+##########
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_gtest(test_${PROJECT_NAME}
+    test/empty_test.cpp
+  )
+
+  target_include_directories(test_${PROJECT_NAME}
+    PRIVATE
+      src
+    SYSTEM PUBLIC
+      ${catkin_INCLUDE_DIRS}
+  )
+
+  target_link_libraries(test_${PROJECT_NAME}
+    gtest_main
+    ${PROJECT_NAME}
+    ${catkin_LIBRARIES}
+  )
+
+  ###################
+  ## Code_coverage ##
+  ###################
+  find_package(cmake_code_coverage QUIET)
+  if(cmake_code_coverage_FOUND)
+    add_gtest_coverage(
+      TEST_BUILD_TARGETS
+        test_${PROJECT_NAME}
     )
-else()
-    message(WARNING "CATKIN NOT FOUND BUILDING WITHOUT ROS!")
+  endif(cmake_code_coverage_FOUND)
 endif()
-
-# Try to compile with c++11
-# http://stackoverflow.com/a/25836953
-include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-if(COMPILER_SUPPORTS_CXX11)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-elseif(COMPILER_SUPPORTS_CXX0X)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-else()
-    message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
-endif()
-
-# Enable compile optimizations
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fsee -fomit-frame-pointer -fno-signed-zeros -fno-math-errno -funroll-loops")
-
-# Enable debug flags (use if you want to debug in gdb)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -Wall -Wuninitialized -Wmaybe-uninitialized")
-
-# Include our header files
-include_directories(
-        src
-        ${EIGEN3_INCLUDE_DIR}
-        ${Boost_INCLUDE_DIRS}
-        ${catkin_INCLUDE_DIRS}
-)
-
-# Set link libraries used by all binaries
-list(APPEND thirdparty_libraries
-        ${Boost_LIBRARIES}
-        ${OpenCV_LIBRARIES}
-        ${catkin_LIBRARIES}
-)
-
-# If we are not building with ROS then we need to manually link to its headers
-# This isn't that elegant of a way, but this at least allows for building without ROS
-# See this stackoverflow answer: https://stackoverflow.com/a/11217008/7718197
-if (NOT catkin_FOUND)
-    message(WARNING "MANUALLY LINKING TO OV_CORE LIBRARY....")
-    include_directories(${ov_core_SOURCE_DIR}/src/)
-    list(APPEND thirdparty_libraries ov_core_lib)
-endif()
-
-##################################################
-# Make the core library
-##################################################
-list(APPEND library_source_files
-        src/sim/Simulator.cpp
-        src/state/State.cpp
-        src/state/StateHelper.cpp
-        src/state/Propagator.cpp
-        src/core/VioManager.cpp
-        src/update/UpdaterHelper.cpp
-        src/update/UpdaterMSCKF.cpp
-        src/update/UpdaterSLAM.cpp
-        src/update/UpdaterZeroVelocity.cpp
-)
-if (catkin_FOUND)
-    list(APPEND library_source_files
-        src/core/RosVisualizer.cpp
-    )
-endif()
-add_library(ov_msckf_lib SHARED ${library_source_files})
-target_link_libraries(ov_msckf_lib ${thirdparty_libraries})
-target_include_directories(ov_msckf_lib PUBLIC src)
-
-
-##################################################
-# Make binary files!
-##################################################
-
-
-if (catkin_FOUND)
-
-    add_executable(run_serial_msckf src/ros_serial_msckf.cpp)
-    target_link_libraries(run_serial_msckf ov_msckf_lib ${thirdparty_libraries})
-
-    add_executable(run_subscribe_msckf src/ros_subscribe_msckf.cpp)
-    target_link_libraries(run_subscribe_msckf ov_msckf_lib ${thirdparty_libraries})
-
-    add_executable(run_simulation src/run_simulation.cpp)
-    target_link_libraries(run_simulation ov_msckf_lib ${thirdparty_libraries})
-
-else()
-
-    add_executable(run_simulation src/run_simulation.cpp)
-    target_link_libraries(run_simulation ov_msckf_lib ${thirdparty_libraries})
-
-endif()
-
-
-add_executable(test_sim_meas src/test_sim_meas.cpp)
-target_link_libraries(test_sim_meas ov_msckf_lib ${thirdparty_libraries})
-
-add_executable(test_sim_repeat src/test_sim_repeat.cpp)
-target_link_libraries(test_sim_repeat ov_msckf_lib ${thirdparty_libraries})
 
 

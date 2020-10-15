@@ -20,6 +20,9 @@
  */
 #include "RosVisualizer.h"
 
+// utils ros_transport
+#include "../utils/ros_transport.hpp"
+
 
 using namespace ov_msckf;
 
@@ -30,40 +33,29 @@ RosVisualizer::RosVisualizer(ros::NodeHandle &nh, VioManager* app, Simulator *si
 
     // Setup our transform broadcaster
     mTfBr = new tf::TransformBroadcaster();
-
     // Setup pose and path publisher
-    pub_poseimu = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>("/ov_msckf/poseimu", 2);
-    ROS_INFO("Publishing: %s", pub_poseimu.getTopic().c_str());
-    pub_odomimu = nh.advertise<nav_msgs::Odometry>("/ov_msckf/odomimu", 2);
-    ROS_INFO("Publishing: %s", pub_odomimu.getTopic().c_str());
-    pub_pathimu = nh.advertise<nav_msgs::Path>("/ov_msckf/pathimu", 2);
-    ROS_INFO("Publishing: %s", pub_pathimu.getTopic().c_str());
+    ov_msckf::advertise<geometry_msgs::PoseWithCovarianceStamped>(nh, pub_poseimu, "imu_ekf_pose");
+    ov_msckf::advertise<nav_msgs::Odometry>(nh, pub_odomimu, "imu_integration_odometry");
+    ov_msckf::advertise<nav_msgs::Path>(nh, pub_pathimu, "imu_path");
 
     // 3D points publishing
-    pub_points_msckf = nh.advertise<sensor_msgs::PointCloud2>("/ov_msckf/points_msckf", 2);
-    ROS_INFO("Publishing: %s", pub_points_msckf.getTopic().c_str());
-    pub_points_slam = nh.advertise<sensor_msgs::PointCloud2>("/ov_msckf/points_slam", 2);
-    ROS_INFO("Publishing: %s", pub_points_msckf.getTopic().c_str());
-    pub_points_aruco = nh.advertise<sensor_msgs::PointCloud2>("/ov_msckf/points_aruco", 2);
-    ROS_INFO("Publishing: %s", pub_points_aruco.getTopic().c_str());
-    pub_points_sim = nh.advertise<sensor_msgs::PointCloud2>("/ov_msckf/points_sim", 2);
-    ROS_INFO("Publishing: %s", pub_points_sim.getTopic().c_str());
+    ov_msckf::advertise<sensor_msgs::PointCloud2>(nh, pub_points_msckf, "msckf_points");
+    ov_msckf::advertise<sensor_msgs::PointCloud2>(nh, pub_points_slam, "slam_points");
+    ov_msckf::advertise<sensor_msgs::PointCloud2>(nh, pub_points_aruco, "aruco_points");
+    ov_msckf::advertise<sensor_msgs::PointCloud2>(nh, pub_points_sim, "sim_points");
 
     // Our tracking image
-    pub_tracks = nh.advertise<sensor_msgs::Image>("/ov_msckf/trackhist", 2);
-    ROS_INFO("Publishing: %s", pub_tracks.getTopic().c_str());
+    ov_msckf::advertise<sensor_msgs::Image>(nh, pub_tracks, "tracking_image");
 
     // Groundtruth publishers
-    pub_posegt = nh.advertise<geometry_msgs::PoseStamped>("/ov_msckf/posegt", 2);
-    ROS_INFO("Publishing: %s", pub_posegt.getTopic().c_str());
-    pub_pathgt = nh.advertise<nav_msgs::Path>("/ov_msckf/pathgt", 2);
-    ROS_INFO("Publishing: %s", pub_pathgt.getTopic().c_str());
+    ov_msckf::advertise<geometry_msgs::PoseStamped>(nh, pub_posegt, "ground_truth_pose");
+    ov_msckf::advertise<nav_msgs::Path>(nh, pub_pathgt, "ground_truth_path");
 
     // Keyframe publishers
-    pub_keyframe_pose = nh.advertise<nav_msgs::Odometry>("/ov_msckf/keyframe_pose", 1000);
-    pub_keyframe_point = nh.advertise<sensor_msgs::PointCloud>("/ov_msckf/keyframe_feats", 1000);
-    pub_keyframe_extrinsic = nh.advertise<nav_msgs::Odometry>("/ov_msckf/keyframe_extrinsic", 1000);
-    pub_keyframe_intrinsics = nh.advertise<sensor_msgs::CameraInfo>("/ov_msckf/keyframe_intrinsics", 1000);
+    ov_msckf::advertise<nav_msgs::Odometry>(nh, pub_keyframe_pose, "keyframe_pose");
+    ov_msckf::advertise<sensor_msgs::PointCloud>(nh, pub_keyframe_point, "points_in_keyframe");
+    ov_msckf::advertise<nav_msgs::Odometry>(nh, pub_keyframe_extrinsic, "keyframe_extrinsic");
+    ov_msckf::advertise<sensor_msgs::CameraInfo>(nh, pub_keyframe_intrinsics, "keyframe_intrinsics");
 
     // option to enable publishing of global to IMU transformation
     nh.param<bool>("publish_global_to_imu_tf", publish_global2imu_tf, true);
@@ -168,7 +160,7 @@ void RosVisualizer::visualize_odometry(double timestamp) {
     // Our odometry message
     nav_msgs::Odometry odomIinM;
     odomIinM.header.stamp = ros::Time(timestamp);
-    odomIinM.header.frame_id = "global";
+    odomIinM.header.frame_id = "vio_odom";
 
     // The POSE component (orientation and position)
     odomIinM.pose.pose.orientation.x = state_plus(0);
@@ -291,7 +283,7 @@ void RosVisualizer::publish_state() {
     geometry_msgs::PoseWithCovarianceStamped poseIinM;
     poseIinM.header.stamp = ros::Time(timestamp_inI);
     poseIinM.header.seq = poses_seq_imu;
-    poseIinM.header.frame_id = "global";
+    poseIinM.header.frame_id = "vio_odom";
     poseIinM.pose.pose.orientation.x = state->_imu->quat()(0);
     poseIinM.pose.pose.orientation.y = state->_imu->quat()(1);
     poseIinM.pose.pose.orientation.z = state->_imu->quat()(2);
@@ -328,7 +320,7 @@ void RosVisualizer::publish_state() {
     nav_msgs::Path arrIMU;
     arrIMU.header.stamp = ros::Time::now();
     arrIMU.header.seq = poses_seq_imu;
-    arrIMU.header.frame_id = "global";
+    arrIMU.header.frame_id = "vio_odom";
     for(size_t i=0; i<poses_imu.size(); i+=std::floor(poses_imu.size()/16384.0)+1) {
         arrIMU.poses.push_back(poses_imu.at(i));
     }
@@ -342,7 +334,7 @@ void RosVisualizer::publish_state() {
     // NOTE: a rotation from GtoI in JPL has the same xyzw as a ItoG Hamilton rotation
     tf::StampedTransform trans;
     trans.stamp_ = ros::Time::now();
-    trans.frame_id_ = "global";
+    trans.frame_id_ = "vio_odom";
     trans.child_frame_id_ = "imu";
     tf::Quaternion quat(state->_imu->quat()(0),state->_imu->quat()(1),state->_imu->quat()(2),state->_imu->quat()(3));
     trans.setRotation(quat);
@@ -424,7 +416,7 @@ void RosVisualizer::publish_features() {
 
     // Declare message and sizes
     sensor_msgs::PointCloud2 cloud;
-    cloud.header.frame_id = "global";
+    cloud.header.frame_id = "vio_odom";
     cloud.header.stamp = ros::Time::now();
     cloud.width  = 3*feats_msckf.size();
     cloud.height = 1;
@@ -459,7 +451,7 @@ void RosVisualizer::publish_features() {
 
     // Declare message and sizes
     sensor_msgs::PointCloud2 cloud_SLAM;
-    cloud_SLAM.header.frame_id = "global";
+    cloud_SLAM.header.frame_id = "vio_odom";
     cloud_SLAM.header.stamp = ros::Time::now();
     cloud_SLAM.width  = 3*feats_slam.size();
     cloud_SLAM.height = 1;
@@ -494,7 +486,7 @@ void RosVisualizer::publish_features() {
 
     // Declare message and sizes
     sensor_msgs::PointCloud2 cloud_ARUCO;
-    cloud_ARUCO.header.frame_id = "global";
+    cloud_ARUCO.header.frame_id = "vio_odom";
     cloud_ARUCO.header.stamp = ros::Time::now();
     cloud_ARUCO.width  = 3*feats_aruco.size();
     cloud_ARUCO.height = 1;
@@ -534,7 +526,7 @@ void RosVisualizer::publish_features() {
 
     // Declare message and sizes
     sensor_msgs::PointCloud2 cloud_SIM;
-    cloud_SIM.header.frame_id = "global";
+    cloud_SIM.header.frame_id = "vio_odom";
     cloud_SIM.header.stamp = ros::Time::now();
     cloud_SIM.width  = 3*feats_sim.size();
     cloud_SIM.height = 1;
@@ -595,7 +587,7 @@ void RosVisualizer::publish_groundtruth() {
     geometry_msgs::PoseStamped poseIinM;
     poseIinM.header.stamp = ros::Time(timestamp_inI);
     poseIinM.header.seq = poses_seq_gt;
-    poseIinM.header.frame_id = "global";
+    poseIinM.header.frame_id = "vio_odom";
     poseIinM.pose.orientation.x = state_gt(1,0);
     poseIinM.pose.orientation.y = state_gt(2,0);
     poseIinM.pose.orientation.z = state_gt(3,0);
@@ -614,7 +606,7 @@ void RosVisualizer::publish_groundtruth() {
     nav_msgs::Path arrIMU;
     arrIMU.header.stamp = ros::Time::now();
     arrIMU.header.seq = poses_seq_gt;
-    arrIMU.header.frame_id = "global";
+    arrIMU.header.frame_id = "vio_odom";
     for(size_t i=0; i<poses_gt.size(); i+=std::floor(poses_gt.size()/16384.0)+1) {
         arrIMU.poses.push_back(poses_gt.at(i));
     }
@@ -627,7 +619,7 @@ void RosVisualizer::publish_groundtruth() {
     // Publish our transform on TF
     tf::StampedTransform trans;
     trans.stamp_ = ros::Time::now();
-    trans.frame_id_ = "global";
+    trans.frame_id_ = "vio_odom";
     trans.child_frame_id_ = "truth";
     tf::Quaternion quat(state_gt(1,0),state_gt(2,0),state_gt(3,0),state_gt(4,0));
     trans.setRotation(quat);
@@ -745,7 +737,7 @@ void RosVisualizer::publish_keyframe_information() {
     // PUBLISH HISTORICAL POSE ESTIMATE
     nav_msgs::Odometry odometry_pose;
     odometry_pose.header = header;
-    odometry_pose.header.frame_id = "global";
+    odometry_pose.header.frame_id = "vio_odom";
     odometry_pose.pose.pose.position.x = stateinG(4);
     odometry_pose.pose.pose.position.y = stateinG(5);
     odometry_pose.pose.pose.position.z = stateinG(6);
@@ -769,7 +761,7 @@ void RosVisualizer::publish_keyframe_information() {
     // Construct the message
     sensor_msgs::PointCloud point_cloud;
     point_cloud.header = header;
-    point_cloud.header.frame_id = "global";
+    point_cloud.header.frame_id = "vio_odom";
     for(const auto &feattimes : hist_feat_timestamps) {
 
         // Skip if this feature has no extraction in the "zero" camera

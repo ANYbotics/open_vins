@@ -23,15 +23,15 @@
 
 
 #include <Eigen/Eigen>
-#include "types/Landmark.h"
+#include <ov_core/types/Landmark.h>
 #include "state/State.h"
 #include "state/StateHelper.h"
-#include "feat/Feature.h"
-#include "types/LandmarkRepresentation.h"
-#include "feat/FeatureInitializer.h"
-#include "feat/FeatureInitializerOptions.h"
-#include "utils/quat_ops.h"
-#include "utils/colors.h"
+#include <ov_core/feat/Feature.h>
+#include <ov_core/types/LandmarkRepresentation.h>
+#include <ov_core/feat/FeatureInitializer.h>
+#include <ov_core/feat/FeatureInitializerOptions.h>
+#include <ov_core/utils/quat_ops.h>
+#include <ov_core/utils/colors.h>
 
 #include "UpdaterHelper.h"
 #include "UpdaterOptions.h"

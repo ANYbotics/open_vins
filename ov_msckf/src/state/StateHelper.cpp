@@ -25,7 +25,6 @@ using namespace ov_core;
 using namespace ov_msckf;
 
 
-
 void StateHelper::EKFPropagation(State *state, const std::vector<Type*> &order_NEW, const std::vector<Type*> &order_OLD,
                                  const Eigen::MatrixXd &Phi, const Eigen::MatrixXd &Q) {
 
@@ -94,11 +93,15 @@ void StateHelper::EKFPropagation(State *state, const std::vector<Type*> &order_N
 
     // We should check if we are not positive semi-definitate (i.e. negative diagionals is not s.p.d)
     Eigen::VectorXd diags = state->_Cov.diagonal();
+#ifndef NDEBUG
     bool found_neg = false;
+#endif
     for(int i=0; i<diags.rows(); i++) {
         if(diags(i) < 0.0) {
             printf(RED "StateHelper::EKFPropagation() - diagonal at %d is %.2f\n" RESET,i,diags(i));
+#ifndef NDEBUG
             found_neg = true;
+#endif
         }
     }
     assert(!found_neg);
@@ -163,11 +166,15 @@ void StateHelper::EKFUpdate(State *state, const std::vector<Type *> &H_order, co
 
     // We should check if we are not positive semi-definitate (i.e. negative diagionals is not s.p.d)
     Eigen::VectorXd diags = state->_Cov.diagonal();
+#ifndef NDEBUG
     bool found_neg = false;
+#endif
     for(int i=0; i<diags.rows(); i++) {
         if(diags(i) < 0.0) {
             printf(RED "StateHelper::EKFUpdate() - diagonal at %d is %.2f\n" RESET,i,diags(i));
+#ifndef NDEBUG
             found_neg = true;
+#endif
         }
     }
     assert(!found_neg);

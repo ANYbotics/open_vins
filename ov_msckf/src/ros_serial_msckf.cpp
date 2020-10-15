@@ -31,7 +31,7 @@
 #include "core/VioManager.h"
 #include "core/VioManagerOptions.h"
 #include "core/RosVisualizer.h"
-#include "utils/dataset_reader.h"
+#include <ov_core/utils/dataset_reader.h>
 #include "utils/parse_ros.h"
 
 
@@ -67,7 +67,7 @@ int main(int argc, char** argv)
     nh.param<std::string>("topic_camera0", topic_camera0, "/cam0/image_raw");
     nh.param<std::string>("topic_camera1", topic_camera1, "/cam1/image_raw");
 
-    // Location of the ROS bag we want to read in
+    // Location of the ROS bag we wanparse_ros_nodehandlert to read in
     std::string path_to_bag;
     //nhPrivate.param<std::string>("path_bag", path_to_bag, "/home/keck/catkin_ws/V1_01_easy.bag");
     nh.param<std::string>("path_bag", path_to_bag, "/home/patrick/datasets/eth/V1_01_easy.bag");

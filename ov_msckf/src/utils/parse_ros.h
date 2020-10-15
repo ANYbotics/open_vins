@@ -17,7 +17,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#if defined(ROS_AVAILABLE) || defined(DOXYGEN)
 #ifndef OV_MSCKF_PARSE_ROSHANDLER_H
 #define OV_MSCKF_PARSE_ROSHANDLER_H
 
@@ -95,8 +94,13 @@ namespace ov_msckf {
         }
 
         // Filter initialization
-        nh.param<double>("init_window_time", params.init_window_time, params.init_window_time);
-        nh.param<double>("init_imu_thresh", params.init_imu_thresh, params.init_imu_thresh);
+        nh.param<double>("init_imu_init_window_time", params.init_imu_init_window_time, params.init_imu_init_window_time);
+        nh.param<double>("zero_velocity_window_time", params.zero_velocity_window_time, params.zero_velocity_window_time);
+        nh.param<int>("init_num_of_imu_measurements", params.init_num_of_imu_measurements, params.init_num_of_imu_measurements);
+        nh.param<double>("init_imu_init_thresh", params.init_imu_init_thresh, params.init_imu_init_thresh);
+        nh.param<bool>("use_contact_for_initialization", params.use_contact_for_initialization, params.use_contact_for_initialization);
+
+
 
         // Zero velocity update
         nh.param<bool>("try_zupt", params.try_zupt, params.try_zupt);
@@ -253,8 +257,5 @@ namespace ov_msckf {
 
 
 
-}
-
-
+}  // namespace ov_msckf
 #endif //OV_MSCKF_PARSE_ROSHANDLER_H
-#endif //ROS_AVAILABLE

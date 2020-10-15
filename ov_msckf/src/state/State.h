@@ -25,11 +25,11 @@
 #include <vector>
 #include <unordered_map>
 
-#include "types/Type.h"
-#include "types/IMU.h"
-#include "types/Vec.h"
-#include "types/PoseJPL.h"
-#include "types/Landmark.h"
+#include <ov_core/types/Type.h>
+#include <ov_core/types/IMU.h>
+#include <ov_core/types/Vec.h>
+#include <ov_core/types/PoseJPL.h>
+#include <ov_core/types/Landmark.h>
 #include "StateOptions.h"
 
 using namespace ov_core;

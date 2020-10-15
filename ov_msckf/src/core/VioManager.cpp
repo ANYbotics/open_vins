@@ -19,7 +19,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "VioManager.h"
-#include "types/Landmark.h"
+#include <ov_core/types/Landmark.h>
+#include <ros/console.h>
 
 
 
@@ -121,7 +122,7 @@ VioManager::VioManager(VioManagerOptions& params_) {
     propagator = new Propagator(params.imu_noises, params.gravity);
 
     // Our state initialize
-    initializer = new InertialInitializer(params.gravity,params.init_window_time,params.init_imu_thresh);
+    initializer = new InertialInitializer(params.gravity, params.init_imu_init_window_time, params.init_imu_init_thresh, params.init_num_of_imu_measurements);
 
     // Make the updater!
     updaterMSCKF = new UpdaterMSCKF(params.msckf_options,params.featinit_options);
@@ -129,12 +130,19 @@ VioManager::VioManager(VioManagerOptions& params_) {
 
     // If we are using zero velocity updates, then create the updater
     if(params.try_zupt) {
-        updaterZUPT = new UpdaterZeroVelocity(params.zupt_options,params.imu_noises,params.gravity,params.zupt_max_velocity,params.zupt_noise_multiplier);
+        updaterZUPT = new UpdaterZeroVelocity(params.zupt_options,params.imu_noises,params.gravity,params.zupt_max_velocity,params.zupt_noise_multiplier, params.init_imu_init_thresh, params.zero_velocity_window_time);
     }
 
 }
 
 
+void VioManager::feed_measurement_contact(double timestamp, bool is_in_contact) {
+
+  // Push back to our initializer
+  if(!is_initialized_vio) {
+    initializer->feed_contact(timestamp, is_in_contact);
+  }
+}
 
 
 void VioManager::feed_measurement_imu(double timestamp, Eigen::Vector3d wm, Eigen::Vector3d am) {
@@ -175,7 +183,7 @@ void VioManager::feed_measurement_monocular(double timestamp, cv::Mat& img0, siz
         did_zupt_update = updaterZUPT->try_update(state, timestamp);
         if(did_zupt_update) {
             cv::Mat img_outtemp0;
-            cv::cvtColor(img0, img_outtemp0, CV_GRAY2RGB);
+            cv::cvtColor(img0, img_outtemp0, cv::COLOR_GRAY2RGB);
             bool is_small = (std::min(img0.cols,img0.rows) < 400);
             auto txtpt = (is_small)? cv::Point(10,30) : cv::Point(30,60);
             cv::putText(img_outtemp0, "zvup active", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,0,255),3);
@@ -229,8 +237,8 @@ void VioManager::feed_measurement_stereo(double timestamp, cv::Mat& img0, cv::Ma
         did_zupt_update = updaterZUPT->try_update(state, timestamp);
         if(did_zupt_update) {
             cv::Mat img_outtemp0, img_outtemp1;
-            cv::cvtColor(img0, img_outtemp0, CV_GRAY2RGB);
-            cv::cvtColor(img1, img_outtemp1, CV_GRAY2RGB);
+            cv::cvtColor(img0, img_outtemp0, cv::COLOR_GRAY2RGB);
+            cv::cvtColor(img1, img_outtemp1, cv::COLOR_GRAY2RGB);
             bool is_small = (std::min(img0.cols,img0.rows) < 400);
             auto txtpt = (is_small)? cv::Point(10,30) : cv::Point(30,60);
             cv::putText(img_outtemp0, "zvup active", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,0,255),3);
@@ -340,11 +348,7 @@ bool VioManager::try_to_initialize() {
     Eigen::Matrix<double, 4, 1> q_GtoI0;
     Eigen::Matrix<double, 3, 1> b_w0, v_I0inG, b_a0, p_I0inG;
 
-    // Try to initialize the system
-    // We will wait for a jerk if we do not have the zero velocity update enabled
-    // Otherwise we can initialize right away as the zero velocity will handle the stationary case
-    bool wait_for_jerk = (updaterZUPT == nullptr);
-    bool success = initializer->initialize_with_imu(time0, q_GtoI0, b_w0, v_I0inG, b_a0, p_I0inG, wait_for_jerk);
+    bool success = initializer->initialize_with_imu(time0, q_GtoI0, b_w0, v_I0inG, b_a0, p_I0inG, params.use_contact_for_initialization);
 
     // Return if it failed
     if (!success) {
@@ -634,15 +638,22 @@ void VioManager::do_feature_propagate_update(double timestamp) {
     double time_total = (rT7-rT1).total_microseconds() * 1e-6;
 
     // Timing information
-    printf(BLUE "[TIME]: %.4f seconds for tracking\n" RESET, time_track);
-    printf(BLUE "[TIME]: %.4f seconds for propagation\n" RESET, time_prop);
-    printf(BLUE "[TIME]: %.4f seconds for MSCKF update (%d features)\n" RESET, time_msckf, (int)featsup_MSCKF.size());
+//    printf(BLUE "[TIME]: %.4f seconds for tracking\n" RESET, time_track);
+//    printf(BLUE "[TIME]: %.4f seconds for propagation\n" RESET, time_prop);
+//    printf(BLUE "[TIME]: %.4f seconds for MSCKF update (%d features)\n" RESET, time_msckf, (int)featsup_MSCKF.size());
+    ROS_DEBUG("[TIME]: %.4f seconds for tracking", time_track);
+    ROS_DEBUG("[TIME]: %.4f seconds for propagation", time_prop);
+    ROS_DEBUG("[TIME]: %.4f seconds for MSCKF update (%d features)", time_msckf, (int)featsup_MSCKF.size());
     if(state->_options.max_slam_features > 0) {
-        printf(BLUE "[TIME]: %.4f seconds for SLAM update (%d feats)\n" RESET, time_slam_update, (int)feats_slam_UPDATE.size());
-        printf(BLUE "[TIME]: %.4f seconds for SLAM delayed init (%d feats)\n" RESET, time_slam_delay, (int)feats_slam_DELAYED.size());
+//        printf(BLUE "[TIME]: %.4f seconds for SLAM update (%d feats)\n" RESET, time_slam_update, (int)feats_slam_UPDATE.size());
+//        printf(BLUE "[TIME]: %.4f seconds for SLAM delayed init (%d feats)\n" RESET, time_slam_delay, (int)feats_slam_DELAYED.size());
+        ROS_DEBUG("[TIME]: %.4f seconds for SLAM update (%d feats)", time_slam_update, (int)feats_slam_UPDATE.size());
+        ROS_DEBUG("[TIME]: %.4f seconds for SLAM delayed init (%d feats)", time_slam_delay, (int)feats_slam_DELAYED.size());
     }
-    printf(BLUE "[TIME]: %.4f seconds for marginalization (%d clones in state)\n" RESET, time_marg, (int)state->_clones_IMU.size());
-    printf(BLUE "[TIME]: %.4f seconds for total\n" RESET, time_total);
+//    printf(BLUE "[TIME]: %.4f seconds for marginalization (%d clones in state)\n" RESET, time_marg, (int)state->_clones_IMU.size());
+//    printf(BLUE "[TIME]: %.4f seconds for total\n" RESET, time_total);
+    ROS_DEBUG("[TIME]: %.4f seconds for marginalization (%d clones in state)", time_marg, (int)state->_clones_IMU.size());
+    ROS_DEBUG("[TIME]: %.4f seconds for total", time_total);
 
     // Finally if we are saving stats to file, lets save it to file
     if(params.record_timing_information && of_statistics.is_open()) {
@@ -671,26 +682,36 @@ void VioManager::do_feature_propagate_update(double timestamp) {
     timelastupdate = timestamp;
 
     // Debug, print our current state
-    printf("q_GtoI = %.3f,%.3f,%.3f,%.3f | p_IinG = %.3f,%.3f,%.3f | dist = %.2f (meters)\n",
-            state->_imu->quat()(0),state->_imu->quat()(1),state->_imu->quat()(2),state->_imu->quat()(3),
-            state->_imu->pos()(0),state->_imu->pos()(1),state->_imu->pos()(2),distance);
-    printf("bg = %.4f,%.4f,%.4f | ba = %.4f,%.4f,%.4f\n",
-             state->_imu->bias_g()(0),state->_imu->bias_g()(1),state->_imu->bias_g()(2),
-             state->_imu->bias_a()(0),state->_imu->bias_a()(1),state->_imu->bias_a()(2));
+//    printf("q_GtoI = %.3f,%.3f,%.3f,%.3f | p_IinG = %.3f,%.3f,%.3f | dist = %.2f (meters)\n",
+//            state->_imu->quat()(0),state->_imu->quat()(1),state->_imu->quat()(2),state->_imu->quat()(3),
+//            state->_imu->pos()(0),state->_imu->pos()(1),state->_imu->pos()(2),distance);
+    ROS_DEBUG("q_GtoI = %.3f,%.3f,%.3f,%.3f | p_IinG = %.3f,%.3f,%.3f | dist = %.2f (meters)",
+         state->_imu->quat()(0),state->_imu->quat()(1),state->_imu->quat()(2),state->_imu->quat()(3),
+         state->_imu->pos()(0),state->_imu->pos()(1),state->_imu->pos()(2),distance);
+//    printf("bg = %.4f,%.4f,%.4f | ba = %.4f,%.4f,%.4f\n",
+//             state->_imu->bias_g()(0),state->_imu->bias_g()(1),state->_imu->bias_g()(2),
+//             state->_imu->bias_a()(0),state->_imu->bias_a()(1),state->_imu->bias_a()(2));
+    ROS_DEBUG("bg = %.4f,%.4f,%.4f | ba = %.4f,%.4f,%.4f",
+         state->_imu->bias_g()(0),state->_imu->bias_g()(1),state->_imu->bias_g()(2),
+         state->_imu->bias_a()(0),state->_imu->bias_a()(1),state->_imu->bias_a()(2));
 
 
     // Debug for camera imu offset
     if(state->_options.do_calib_camera_timeoffset) {
-        printf("camera-imu timeoffset = %.5f\n",state->_calib_dt_CAMtoIMU->value()(0));
+        // printf("camera-imu timeoffset = %.5f\n",state->_calib_dt_CAMtoIMU->value()(0));
+        ROS_DEBUG("camera-imu timeoffset = %.5f",state->_calib_dt_CAMtoIMU->value()(0));
     }
 
     // Debug for camera intrinsics
     if(state->_options.do_calib_camera_intrinsics) {
         for(int i=0; i<state->_options.num_cameras; i++) {
             Vec* calib = state->_cam_intrinsics.at(i);
-            printf("cam%d intrinsics = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f,%.3f\n",(int)i,
-                     calib->value()(0),calib->value()(1),calib->value()(2),calib->value()(3),
-                     calib->value()(4),calib->value()(5),calib->value()(6),calib->value()(7));
+//            printf("cam%d intrinsics = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f,%.3f\n",(int)i,
+//                     calib->value()(0),calib->value()(1),calib->value()(2),calib->value()(3),
+//                     calib->value()(4),calib->value()(5),calib->value()(6),calib->value()(7));
+            ROS_DEBUG("cam%d intrinsics = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f,%.3f",(int)i,
+                 calib->value()(0),calib->value()(1),calib->value()(2),calib->value()(3),
+                 calib->value()(4),calib->value()(5),calib->value()(6),calib->value()(7));
         }
     }
 
@@ -698,11 +719,17 @@ void VioManager::do_feature_propagate_update(double timestamp) {
     if(state->_options.do_calib_camera_pose) {
         for(int i=0; i<state->_options.num_cameras; i++) {
             PoseJPL* calib = state->_calib_IMUtoCAM.at(i);
-            printf("cam%d extrinsics = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f\n",(int)i,
-                     calib->quat()(0),calib->quat()(1),calib->quat()(2),calib->quat()(3),
-                     calib->pos()(0),calib->pos()(1),calib->pos()(2));
+//            printf("cam%d extrinsics = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f\n",(int)i,
+//                     calib->quat()(0),calib->quat()(1),calib->quat()(2),calib->quat()(3),
+//                     calib->pos()(0),calib->pos()(1),calib->pos()(2));
+            ROS_DEBUG("cam%d extrinsics = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f",(int)i,
+                 calib->quat()(0),calib->quat()(1),calib->quat()(2),calib->quat()(3),
+                 calib->pos()(0),calib->pos()(1),calib->pos()(2));
         }
     }
+    // Todo (GZ): think of a better way to have clean ROS debug output.
+    ROS_DEBUG("====================================================================================================");
+
 
 
 }

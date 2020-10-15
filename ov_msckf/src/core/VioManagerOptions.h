@@ -29,9 +29,9 @@
 #include "state/StateOptions.h"
 #include "state/Propagator.h"
 #include "update/UpdaterOptions.h"
-#include "feat/FeatureInitializerOptions.h"
-#include "utils/colors.h"
-#include "utils/quat_ops.h"
+#include <ov_core/feat/FeatureInitializerOptions.h>
+#include <ov_core/utils/colors.h>
+#include <ov_core/utils/quat_ops.h>
 
 
 using namespace std;
@@ -60,11 +60,20 @@ namespace ov_msckf {
         /// Delay, in seconds, that we should wait from init before we start estimating SLAM features
         double dt_slam_delay = 2.0;
 
-        /// Amount of time we will initialize over (seconds)
-        double init_window_time = 1.0;
+        /// Amount of time we will use to initialize VIO over (seconds)
+        double init_imu_init_window_time = 1.5;
 
-        ///  Variance threshold on our acceleration to be classified as moving
-        double init_imu_thresh = 1.0;
+        /// Amount of time we will use to detect zero velocity (seconds)
+        double zero_velocity_window_time = 1.0;
+
+        /// The number of IMU measurements used for initialization
+        int init_num_of_imu_measurements = 200;
+
+        ///  Variance threshold on our acceleration to use IMU measurements for initialization
+        double init_imu_init_thresh = 0.025;
+
+        /// Whether to consider contact when initializing VIO system
+        bool use_contact_for_initialization = true;
 
         /// If we should try to use zero velocity update
         bool try_zupt = false;
@@ -89,10 +98,13 @@ namespace ov_msckf {
             printf("ESTIMATOR PARAMETERS:\n");
             state_options.print();
             printf("\t- dt_slam_delay: %.1f\n", dt_slam_delay);
-            printf("\t- init_window_time: %.2f\n", init_window_time);
-            printf("\t- init_imu_thresh: %.2f\n", init_imu_thresh);
+            printf("\t- init_imu_init_window_time: %.2f\n", init_imu_init_window_time);
+            printf("\t- zero_velocity_window_time: %.2f\n", zero_velocity_window_time);
+            printf("\t- init_num_of_imu_measurements: %d\n", init_num_of_imu_measurements);
+            printf("\t- init_imu_init_thresh: %.4f\n", init_imu_init_thresh);
+            printf("\t- use_contact_for_initialization: %d\n", use_contact_for_initialization);
             printf("\t- zero_velocity_update: %d\n", try_zupt);
-            printf("\t- zupt_max_velocity: %.2f\n", zupt_max_velocity);
+            printf("\t- zupt_max_velocity: %.4f\n", zupt_max_velocity);
             printf("\t- zupt_noise_multiplier: %.2f\n", zupt_noise_multiplier);
             printf("\t- record timing?: %d\n", (int)record_timing_information);
             printf("\t- record timing filepath: %s\n", record_timing_filepath.c_str());

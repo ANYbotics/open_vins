@@ -25,8 +25,8 @@
 #include "state/State.h"
 #include "state/StateHelper.h"
 #include "state/Propagator.h"
-#include "utils/quat_ops.h"
-#include "utils/colors.h"
+#include <ov_core/utils/quat_ops.h>
+#include <ov_core/utils/colors.h>
 
 #include "UpdaterHelper.h"
 #include "UpdaterOptions.h"
@@ -60,9 +60,12 @@ namespace ov_msckf {
          * @param gravity Global gravity of the system (normally [0,0,9.81])
          * @param zupt_max_velocity Max velocity we should consider to do a update with
          * @param zupt_noise_multiplier Multiplier of our IMU noise matrix (default should be 1.0)
+         * @param imu_zero_velocity_threshold Variance threshold on IMU acceleration to be used for zero velocity detection
+         * @param imu_zero_velocity_window_length Select IMU measurements in this window length to detect zero velocity. Unit: second
          */
-        UpdaterZeroVelocity(UpdaterOptions &options, Propagator::NoiseManager &noises, Eigen::Vector3d gravity, double zupt_max_velocity, double zupt_noise_multiplier)
-                            : _options(options), _noises(noises), _gravity(gravity), _zupt_max_velocity(zupt_max_velocity), _zupt_noise_multiplier(zupt_noise_multiplier) {
+        UpdaterZeroVelocity(UpdaterOptions &options, Propagator::NoiseManager &noises, Eigen::Vector3d gravity, double zupt_max_velocity, double zupt_noise_multiplier, double imu_zero_velocity_threshold, double imu_zero_velocity_window_length)
+                            : _options(options), _noises(noises), _gravity(gravity), _zupt_max_velocity(zupt_max_velocity), _zupt_noise_multiplier(zupt_noise_multiplier), _imu_zero_velocity_threshold(imu_zero_velocity_threshold),
+                              _imu_zero_velocity_window_length(imu_zero_velocity_window_length) {
 
             // Save our raw pixel noise squared
             _noises.sigma_w_2 = std::pow(_noises.sigma_w,2);
@@ -154,6 +157,12 @@ namespace ov_msckf {
         /// Estimate for time offset at last propagation time
         double last_prop_time_offset = -INFINITY;
         bool have_last_prop_time_offset = false;
+
+        /// Variance threshold on IMU acceleration to be used for zero velocity detection
+        double _imu_zero_velocity_threshold;
+
+        /// Select IMU measurements in this window length to detect zero velocity. Unit: second
+        double _imu_zero_velocity_window_length;
 
 
     };

@@ -23,8 +23,8 @@
 
 
 #include "State.h"
-#include "types/Landmark.h"
-#include "utils/colors.h"
+#include <ov_core/types/Landmark.h>
+#include <ov_core/utils/colors.h>
 
 #include <boost/math/distributions/chi_squared.hpp>
 

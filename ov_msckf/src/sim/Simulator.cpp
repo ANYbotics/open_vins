@@ -554,7 +554,7 @@ std::vector<std::pair<size_t,Eigen::VectorXf>> Simulator::project_pointcloud(con
 
 
 void Simulator::generate_points(const Eigen::Matrix3d &R_GtoI, const Eigen::Vector3d &p_IinG,
-                                int camid, std::unordered_map<size_t,Eigen::Vector3d> &feats, int numpts) {
+                                int camid, std::unordered_map<size_t,Eigen::Vector3d> &/*feats*/, int numpts) {
 
     // Assert we have good camera
     assert(camid < params.state_options.num_cameras);

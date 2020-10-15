@@ -325,7 +325,7 @@ void ResultTrajectory::calculate_error(Statistics &posx, Statistics &posy, Stati
 
         // Convert to roll pitch yaw (also need to "wrap" the error to -pi to pi)
         // NOTE: our rot2rpy is in the form R_input = R_z(yaw)*R_y(pitch)*R_x(roll)
-        // NOTE: this error is in the "global" frame since we do rot2rpy on R_ItoG rotation
+        // NOTE: this error is in the "vio_odom" frame since we do rot2rpy on R_ItoG rotation
         Eigen::Vector3d ypr_est_ItoG = Math::rot2rpy(Math::quat_2_Rot(est_poses.at(i).block(3,0,4,1)).transpose());
         Eigen::Vector3d ypr_gt_ItoG = Math::rot2rpy(Math::quat_2_Rot(gt_poses_aignedtoEST.at(i).block(3,0,4,1)).transpose());
         Eigen::Vector3d errori_rpy = ypr_gt_ItoG-ypr_est_ItoG;

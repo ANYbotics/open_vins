@@ -22,8 +22,7 @@
 
 
 #include "core/VioManagerOptions.h"
-#include "utils/CLI11.hpp"
-
+#include <ov_core/utils/CLI11.hpp>
 
 namespace ov_msckf {
 
@@ -72,8 +71,12 @@ namespace ov_msckf {
         app1.add_option("--feat_rep_aruco", feat_rep_aruco_str, "");
 
         // Filter initialization
-        app1.add_option("--init_window_time", params.init_window_time, "");
-        app1.add_option("--init_imu_thresh", params.init_imu_thresh, "");
+        app1.add_option("--init_imu_init_window_time", params.init_imu_init_window_time, "");
+        app1.add_option("--zero_velocity_window_time", params.zero_velocity_window_time, "");
+        app1.add_option("--init_imu_init_thresh", params.init_imu_init_thresh, "");
+        app1.add_option("--init_num_of_imu_measurements", params.init_num_of_imu_measurements, "");
+        app1.add_option("--use_contact_for_initialization", params.use_contact_for_initialization, "");
+
 
         // Zero velocity update
         app1.add_option("--try_zupt", params.try_zupt, "");

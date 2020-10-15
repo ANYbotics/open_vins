@@ -25,9 +25,9 @@
 
 #include "sim/Simulator.h"
 #include "core/VioManager.h"
-#include "utils/dataset_reader.h"
+#include <ov_core/utils/dataset_reader.h>
 #include "utils/parse_cmd.h"
-#include "utils/colors.h"
+#include <ov_core/utils/colors.h>
 
 
 #ifdef ROS_AVAILABLE

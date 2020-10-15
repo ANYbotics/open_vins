@@ -18,6 +18,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "UpdaterZeroVelocity.h"
+#include <ros/console.h>
 
 
 using namespace ov_msckf;
@@ -48,17 +49,43 @@ bool UpdaterZeroVelocity::try_update(State *state, double timestamp) {
     double time1 = timestamp+t_off_new;
 
     // Select bounding inertial measurements
-    std::vector<Propagator::IMUDATA> imu_recent = Propagator::select_imu_readings(imu_data, time0, time1);
+    // TODO(guoxiang): if there is a missing image in the stream, we will have a problem. Since the difference between time0 and time1 is too big.
+    // std::vector<Propagator::IMUDATA> imu_recent = Propagator::select_imu_readings(imu_data, time0, time1);
+    std::vector<Propagator::IMUDATA> imu_recent = Propagator::select_imu_readings(imu_data, timestamp - _imu_zero_velocity_window_length, timestamp);
 
     // Move forward in time
     last_prop_time_offset = t_off_new;
 
     // Check that we have at least one measurement to propagate with
     if(imu_recent.empty() || imu_recent.size() < 2) {
-        printf(RED "[ZUPT]: There are no IMU data to check for zero velocity with!!\n" RESET);
+        ROS_WARN_THROTTLE(3, "There are not enough IMU data to check for zero velocity.");
         return false;
     }
 
+    ROS_DEBUG_THROTTLE(3, "The number of selected IMU measurements for zero velocity update is: %zu (Debugging is throttled: 3s)", imu_recent.size());
+
+    Eigen::Vector3d linsum = Eigen::Vector3d::Zero();
+    for(size_t i=0; i < imu_recent.size(); i++) {
+      linsum += imu_recent.at(i).am;
+    }
+    Eigen::Vector3d linavg = linsum/imu_recent.size();
+
+    // Check IMU acceleration variance.
+    double a_var = 0;
+    for(auto data : imu_recent) {
+      a_var += (data.am-linavg).dot(data.am-linavg);
+    }
+
+    a_var = std::sqrt(a_var/(imu_recent.size()-1));
+
+    ROS_DEBUG_THROTTLE(3, "IMU acceleration variance value in the zero velocity detection window: %.4f / %.4f. (Debugging is throttled: 3s)", a_var, _imu_zero_velocity_threshold);
+    // If acceleration variance is above the threshold, this means the agent is not standstill. Return false.
+    if(a_var >= _imu_zero_velocity_threshold) {
+      return false;
+    }
+
+    // todo: GZ, this is simple zero velocity logic, need further check. Need to improve!!
+    /*
     // If we should integrate the acceleration and say the velocity should be zero
     // Also if we should still inflate the bias based on their random walk noises
     bool integrated_accel_constraint = false;
@@ -171,6 +198,7 @@ bool UpdaterZeroVelocity::try_update(State *state, double timestamp) {
     // Else we are good, update the system
     printf(CYAN "[ZUPT]: accepted zero velocity |v_IinG| = %.3f (chi2 %.3f < %.3f)\n" RESET,state->_imu->vel().norm(),chi2,_options.chi2_multipler*chi2_check);
     StateHelper::EKFUpdate(state, Hx_order, H, res, R);
+     */
 
     // Finally move the state time forward
     state->_timestamp = timestamp;

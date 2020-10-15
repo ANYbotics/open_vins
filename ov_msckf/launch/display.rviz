@@ -57,7 +57,7 @@ Visualization Manager:
           Value: true
         cam1:
           Value: true
-        global:
+        vio_odom:
           Value: true
         imu:
           Value: true
@@ -69,7 +69,7 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        global:
+        vio_odom:
           imu:
             cam0:
               {}
@@ -81,7 +81,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /ov_msckf/trackhist
+      Image Topic: /visual_inertial_odometry/tracking_image
       Max Value: 1
       Median window: 5
       Min Value: 0
@@ -111,7 +111,7 @@ Visualization Manager:
       Radius: 0.0299999993
       Shaft Diameter: 0.100000001
       Shaft Length: 0.100000001
-      Topic: /ov_msckf/pathimu
+      Topic: /visual_inertial_odometry/imu_path
       Unreliable: false
       Value: true
     - Alpha: 1
@@ -134,7 +134,7 @@ Visualization Manager:
       Radius: 0.0299999993
       Shaft Diameter: 0.100000001
       Shaft Length: 0.100000001
-      Topic: /ov_msckf/pathgt
+      Topic: /visual_inertial_odometry/ground_truth_path
       Unreliable: false
       Value: true
     - Alpha: 0.800000012
@@ -162,7 +162,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.00999999978
       Style: Points
-      Topic: /ov_msckf/points_msckf
+      Topic: /visual_inertial_odometry/msckf_points
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -192,7 +192,7 @@ Visualization Manager:
       Size (Pixels): 8
       Size (m): 0.00999999978
       Style: Points
-      Topic: /ov_msckf/points_slam
+      Topic: /visual_inertial_odometry/slam_points
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -222,7 +222,7 @@ Visualization Manager:
       Size (Pixels): 15
       Size (m): 0.00999999978
       Style: Points
-      Topic: /ov_msckf/points_aruco
+      Topic: /visual_inertial_odometry/aruco_points
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -252,7 +252,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.00999999978
       Style: Points
-      Topic: /ov_msckf/points_sim
+      Topic: /visual_inertial_odometry/sim_points
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -261,7 +261,7 @@ Visualization Manager:
   Global Options:
     Background Color: 44; 44; 44
     Default Light: true
-    Fixed Frame: global
+    Fixed Frame: vio_odom
     Frame Rate: 30
   Name: root
   Tools:

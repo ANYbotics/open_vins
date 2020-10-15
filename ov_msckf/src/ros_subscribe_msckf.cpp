@@ -34,8 +34,12 @@
 #include "core/VioManager.h"
 #include "core/VioManagerOptions.h"
 #include "core/RosVisualizer.h"
-#include "utils/dataset_reader.h"
+#include <ov_core/utils/dataset_reader.h>
+#include <signal_logger_msgs/UInt32Stamped.h>
 #include "utils/parse_ros.h"
+
+// param io
+#include <param_io/get_param.hpp>
 
 
 using namespace ov_msckf;
@@ -53,6 +57,7 @@ cv::Mat img0_buffer, img1_buffer;
 void callback_inertial(const sensor_msgs::Imu::ConstPtr& msg);
 void callback_monocular(const sensor_msgs::ImageConstPtr& msg0);
 void callback_stereo(const sensor_msgs::ImageConstPtr& msg0, const sensor_msgs::ImageConstPtr& msg1);
+void callback_feet_contact(const signal_logger_msgs::UInt32Stamped::ConstPtr& msg0, const signal_logger_msgs::UInt32Stamped::ConstPtr& msg1, const signal_logger_msgs::UInt32Stamped::ConstPtr& msg2, const signal_logger_msgs::UInt32Stamped::ConstPtr& msg3);
 
 
 
@@ -60,10 +65,10 @@ void callback_stereo(const sensor_msgs::ImageConstPtr& msg0, const sensor_msgs::
 int main(int argc, char** argv) {
 
     // Launch our ros node
-    ros::init(argc, argv, "run_subscribe_msckf");
+    ros::init(argc, argv, "visual_inertial_odometry");
     ros::NodeHandle nh("~");
 
-    // Create our VIO system
+    // Create our VIO system. Read parameters from ROS parameter server.
     VioManagerOptions params = parse_ros_nodehandler(nh);
     sys = new VioManager(params);
     viz = new RosVisualizer(nh, sys);
@@ -72,31 +77,50 @@ int main(int argc, char** argv) {
     //===================================================================================
     //===================================================================================
     //===================================================================================
-
-    // Our camera topics (left and right stereo)
-    std::string topic_imu;
-    std::string topic_camera0, topic_camera1;
-    nh.param<std::string>("topic_imu", topic_imu, "/imu0");
-    nh.param<std::string>("topic_camera0", topic_camera0, "/cam0/image_raw");
-    nh.param<std::string>("topic_camera1", topic_camera1, "/cam1/image_raw");
+    std::string imu_sensor = "imu_sensor";
+    std::string camera_input_1 = "wide_angle_camera_front";
+    std::string camera_input_2 = "wide_angle_camera_rear";
+    std::string contact_force_lf_foot = "contact_force_lf_foot";
+    std::string contact_force_rf_foot = "contact_force_rf_foot";
+    std::string contact_force_lh_foot = "contact_force_lh_foot";
+    std::string contact_force_rh_foot = "contact_force_rh_foot";
 
     // Logic for sync stereo subscriber
     // https://answers.ros.org/question/96346/subscribe-to-two-image_raws-with-one-function/?answer=96491#post-id-96491
-    message_filters::Subscriber<sensor_msgs::Image> image_sub0(nh,topic_camera0.c_str(),1);
-    message_filters::Subscriber<sensor_msgs::Image> image_sub1(nh,topic_camera1.c_str(),1);
+    message_filters::Subscriber<sensor_msgs::Image> image_sub1(nh, param_io::param<std::string>(nh, "subscribers/" + camera_input_1 + "/topic", camera_input_1),
+                                                               param_io::param<uint32_t>(nh, "subscribers/" + camera_input_1 + "/queue_size", 1));
+    message_filters::Subscriber<sensor_msgs::Image> image_sub2(nh,param_io::param<std::string>(nh, "subscribers/" + camera_input_2 + "/topic", camera_input_2),
+                                                               param_io::param<uint32_t>(nh, "subscribers/" + camera_input_2 + "/queue_size", 1));
     //message_filters::TimeSynchronizer<sensor_msgs::Image,sensor_msgs::Image> sync(image_sub0,image_sub1,5);
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
-    message_filters::Synchronizer<sync_pol> sync(sync_pol(5), image_sub0,image_sub1);
+    message_filters::Synchronizer<sync_pol> sync(sync_pol(5), image_sub1, image_sub2);
 
     // Create subscribers
-    ros::Subscriber subimu = nh.subscribe(topic_imu.c_str(), 9999, callback_inertial);
+    ros::Subscriber subimu = nh.subscribe(param_io::param<std::string>(nh, "subscribers/" + imu_sensor + "/topic", imu_sensor),
+                                          param_io::param<uint32_t>(nh, "subscribers/" + imu_sensor + "/queue_size", 1), callback_inertial);
+
+    // Create feet contact subscriber.
+    message_filters::Subscriber<signal_logger_msgs::UInt32Stamped> foot_lf_sub(nh,param_io::param<std::string>(nh, "subscribers/" + contact_force_lf_foot + "/topic", contact_force_lf_foot),
+                                                                               param_io::param<uint32_t>(nh, "subscribers/" + contact_force_lf_foot + "/queue_size", 1));
+    message_filters::Subscriber<signal_logger_msgs::UInt32Stamped> foot_lh_sub(nh,param_io::param<std::string>(nh, "subscribers/" + contact_force_lh_foot + "/topic", contact_force_lh_foot),
+                                                                               param_io::param<uint32_t>(nh, "subscribers/" + contact_force_lh_foot + "/queue_size", 1));
+    message_filters::Subscriber<signal_logger_msgs::UInt32Stamped> foot_rf_sub(nh,param_io::param<std::string>(nh, "subscribers/" + contact_force_rf_foot + "/topic", contact_force_rf_foot),
+                                                                               param_io::param<uint32_t>(nh, "subscribers/" + contact_force_rf_foot + "/queue_size", 1));
+    message_filters::Subscriber<signal_logger_msgs::UInt32Stamped> foot_rh_sub(nh,param_io::param<std::string>(nh, "subscribers/" + contact_force_rh_foot + "/topic", contact_force_rh_foot),
+                                                                               param_io::param<uint32_t>(nh, "subscribers/" + contact_force_rh_foot + "/queue_size", 1));
+    typedef message_filters::sync_policies::ExactTime<signal_logger_msgs::UInt32Stamped, signal_logger_msgs::UInt32Stamped, signal_logger_msgs::UInt32Stamped, signal_logger_msgs::UInt32Stamped> feet_contact_sync_pol;
+    message_filters::Synchronizer<feet_contact_sync_pol> feet_contact_sync(feet_contact_sync_pol(9999), foot_lf_sub,foot_lh_sub, foot_rf_sub, foot_rh_sub);
+    feet_contact_sync.registerCallback(boost::bind(&callback_feet_contact, _1, _2, _3, _4));
+
+
     ros::Subscriber subcam;
     if(params.state_options.num_cameras == 1) {
-        ROS_INFO("subscribing to: %s", topic_camera0.c_str());
-        subcam = nh.subscribe(topic_camera0.c_str(), 1, callback_monocular);
+        ROS_INFO("subscribing to: %s", param_io::param<std::string>(nh, "subscribers/" + camera_input_1 + "/topic", camera_input_1).c_str());
+        subcam = nh.subscribe(param_io::param<std::string>(nh, "subscribers/" + camera_input_1 + "/topic", camera_input_1),
+                              param_io::param<uint32_t>(nh, "subscribers/" + camera_input_1 + "/queue_size", 1), callback_monocular);
     } else if(params.state_options.num_cameras == 2) {
-        ROS_INFO("subscribing to: %s", topic_camera0.c_str());
-        ROS_INFO("subscribing to: %s", topic_camera1.c_str());
+        ROS_INFO("subscribing to: %s", param_io::param<std::string>(nh, "subscribers/" + camera_input_1 + "/topic", camera_input_1).c_str());
+        ROS_INFO("subscribing to: %s", param_io::param<std::string>(nh, "subscribers/" + camera_input_2 + "/topic", camera_input_2).c_str());
         sync.registerCallback(boost::bind(&callback_stereo, _1, _2));
     } else {
         ROS_ERROR("INVALID MAX CAMERAS SELECTED!!!");
@@ -108,7 +132,7 @@ int main(int argc, char** argv) {
     //===================================================================================
 
     // Spin off to ROS
-    ROS_INFO("done...spinning to ros");
+    ROS_INFO("Finish setting up subscribers.");
     ros::spin();
 
     // Final visualization
@@ -125,6 +149,20 @@ int main(int argc, char** argv) {
 
 }
 
+
+void callback_feet_contact(const signal_logger_msgs::UInt32Stamped::ConstPtr& msg0, const signal_logger_msgs::UInt32Stamped::ConstPtr& msg1, const signal_logger_msgs::UInt32Stamped::ConstPtr& msg2, const signal_logger_msgs::UInt32Stamped::ConstPtr& msg3) {
+
+  double time = msg0->header.stamp.toSec();
+  auto is_in_contact_foot0 = msg0->value;
+  auto is_in_contact_foot1 = msg1->value;
+  auto is_in_contact_foot2 = msg2->value;
+  auto is_in_contact_foot3 = msg3->value;
+
+  bool is_in_contact = (is_in_contact_foot0 != 0u) && (is_in_contact_foot1 != 0u) && (is_in_contact_foot2 != 0u) && (is_in_contact_foot3 != 0u);
+
+  sys->feed_measurement_contact(time, is_in_contact);
+
+}
 
 void callback_inertial(const sensor_msgs::Imu::ConstPtr& msg) {
 

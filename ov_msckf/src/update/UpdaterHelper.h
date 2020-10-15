@@ -24,12 +24,12 @@
 
 #include <Eigen/Eigen>
 
-#include "feat/Feature.h"
-#include "types/LandmarkRepresentation.h"
+#include <ov_core/feat/Feature.h>
+#include <ov_core/types/LandmarkRepresentation.h>
 #include "state/State.h"
 #include "state/StateOptions.h"
-#include "utils/quat_ops.h"
-#include "utils/colors.h"
+#include <ov_core/utils/quat_ops.h>
+#include <ov_core/utils/colors.h>
 
 
 namespace ov_msckf {

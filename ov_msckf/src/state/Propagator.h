@@ -23,7 +23,7 @@
 
 
 #include "state/StateHelper.h"
-#include "utils/quat_ops.h"
+#include <ov_core/utils/quat_ops.h>
 
 
 using namespace ov_core;

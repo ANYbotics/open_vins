@@ -117,10 +117,9 @@ namespace ov_eval {
          * @param R Rotation from estimate to GT frame that will be computed
          * @param t translation from estimate to GT frame that will be computed
          * @param s scale from estimate to GT frame that will be computed
-         * @param n_aligned Number of poses to use for alignment (-1 will use all)
          */
         static void align_sim3(const std::vector<Eigen::Matrix<double,7,1>> &traj_es, const std::vector<Eigen::Matrix<double,7,1>> &traj_gt,
-                               Eigen::Matrix3d &R, Eigen::Vector3d &t, double &s, int n_aligned = -1);
+                               Eigen::Matrix3d &R, Eigen::Vector3d &t, double &s);
 
 
 
