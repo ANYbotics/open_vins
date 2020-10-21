@@ -13,6 +13,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CATKIN_PACKAGE_HEADER_DEPENDENCIES
   cv_bridge
   geometry_msgs
+  image_transport
   nav_msgs
   ov_core
   param_io

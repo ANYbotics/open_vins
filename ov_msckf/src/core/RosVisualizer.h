@@ -36,6 +36,7 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <image_transport/image_transport.h>
 #include <tf/transform_broadcaster.h>
 
 #include <cv_bridge/cv_bridge.h>
@@ -113,6 +114,9 @@ namespace ov_msckf {
         /// ROS node handle that we publish onto
         ros::NodeHandle _nh;
 
+        /// Image transport object.
+        image_transport::ImageTransport _it;
+
         /// Core application of the filter system
         VioManager* _app;
 
@@ -122,7 +126,7 @@ namespace ov_msckf {
         // Our publishers
         ros::Publisher pub_poseimu, pub_odomimu, pub_pathimu;
         ros::Publisher pub_points_msckf, pub_points_slam, pub_points_aruco, pub_points_sim;
-        ros::Publisher pub_tracks;
+        image_transport::Publisher pub_tracks;
         ros::Publisher pub_keyframe_pose, pub_keyframe_point, pub_keyframe_extrinsic, pub_keyframe_intrinsics;
         tf::TransformBroadcaster *mTfBr;
 

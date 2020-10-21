@@ -47,6 +47,7 @@
 
     <depend>eigen</depend>
     <depend>boost</depend>
+    <depend>image_transport</depend>
     <depend>libopencv-dev</depend>
     <depend>param_io</depend>
 

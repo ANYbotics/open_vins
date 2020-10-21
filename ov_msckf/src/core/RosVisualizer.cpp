@@ -23,12 +23,16 @@
 // utils ros_transport
 #include "../utils/ros_transport.hpp"
 
+// param io
+#include <param_io/get_param.hpp>
+
 
 using namespace ov_msckf;
 
 
 
-RosVisualizer::RosVisualizer(ros::NodeHandle &nh, VioManager* app, Simulator *sim) : _nh(nh), _app(app), _sim(sim) {
+RosVisualizer::RosVisualizer(ros::NodeHandle &nh, VioManager* app, Simulator *sim) : _nh(nh), _it(nh), _app(app), _sim(sim) {
+
 
 
     // Setup our transform broadcaster
@@ -45,7 +49,10 @@ RosVisualizer::RosVisualizer(ros::NodeHandle &nh, VioManager* app, Simulator *si
     ov_msckf::advertise<sensor_msgs::PointCloud2>(nh, pub_points_sim, "sim_points");
 
     // Our tracking image
-    ov_msckf::advertise<sensor_msgs::Image>(nh, pub_tracks, "tracking_image");
+    string key = "tracking_image";
+    pub_tracks = _it.advertise(param_io::param<std::string>(nh, "publishers/" + key + "/topic", key),
+                               param_io::param<uint32_t>(nh, "publishers/" + key + "/queue_size", 1),
+                               param_io::param<bool>(nh, "publishers/" + key + "/latch", false));
 
     // Groundtruth publishers
     ov_msckf::advertise<geometry_msgs::PoseStamped>(nh, pub_posegt, "ground_truth_pose");
