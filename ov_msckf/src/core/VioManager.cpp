@@ -408,9 +408,9 @@ void VioManager::do_feature_propagate_update(double timestamp) {
 
     // If we have not reached max clones, we should just return...
     // This isn't super ideal, but it keeps the logic after this easier...
-    // We can start processing things when we have at least 5 clones since we can start triangulating things...
+    // We can start processing things when we have at least 5 clones (by pure IMU integration) since we can start triangulating things...
     if((int)state->_clones_IMU.size() < std::min(state->_options.max_clone_size,5)) {
-        printf("waiting for enough clone states (%d of %d)....\n",(int)state->_clones_IMU.size(),std::min(state->_options.max_clone_size,5));
+        ROS_INFO("Waiting for enough clone states (%d of %d)....",(int)state->_clones_IMU.size(),std::min(state->_options.max_clone_size,5));
         return;
     }
 
@@ -430,7 +430,7 @@ void VioManager::do_feature_propagate_update(double timestamp) {
     std::vector<Feature*> feats_lost, feats_marg, feats_slam;
     feats_lost = trackFEATS->get_feature_database()->features_not_containing_newer(state->_timestamp);
 
-    // Don't need to get the oldest features untill we reach our max number of clones
+    // Don't need to get the oldest features until we reach our max number of clones
     if((int)state->_clones_IMU.size() > state->_options.max_clone_size) {
         feats_marg = trackFEATS->get_feature_database()->features_containing(state->margtimestep());
         if(trackARUCO != nullptr && timestamp-startup_time >= params.dt_slam_delay) {
@@ -638,22 +638,15 @@ void VioManager::do_feature_propagate_update(double timestamp) {
     double time_total = (rT7-rT1).total_microseconds() * 1e-6;
 
     // Timing information
-//    printf(BLUE "[TIME]: %.4f seconds for tracking\n" RESET, time_track);
-//    printf(BLUE "[TIME]: %.4f seconds for propagation\n" RESET, time_prop);
-//    printf(BLUE "[TIME]: %.4f seconds for MSCKF update (%d features)\n" RESET, time_msckf, (int)featsup_MSCKF.size());
-    ROS_DEBUG("[TIME]: %.4f seconds for tracking", time_track);
-    ROS_DEBUG("[TIME]: %.4f seconds for propagation", time_prop);
-    ROS_DEBUG("[TIME]: %.4f seconds for MSCKF update (%d features)", time_msckf, (int)featsup_MSCKF.size());
+    ROS_DEBUG_THROTTLE(3, "[TIME]: %.4f seconds for tracking (Debug is throttled: 3s)", time_track);
+    ROS_DEBUG_THROTTLE(3, "[TIME]: %.4f seconds for propagation (Debug is throttled: 3s)", time_prop);
+    ROS_DEBUG_THROTTLE(3, "[TIME]: %.4f seconds for MSCKF update (%d features) (Debug is throttled: 3s)", time_msckf, (int)featsup_MSCKF.size());
     if(state->_options.max_slam_features > 0) {
-//        printf(BLUE "[TIME]: %.4f seconds for SLAM update (%d feats)\n" RESET, time_slam_update, (int)feats_slam_UPDATE.size());
-//        printf(BLUE "[TIME]: %.4f seconds for SLAM delayed init (%d feats)\n" RESET, time_slam_delay, (int)feats_slam_DELAYED.size());
-        ROS_DEBUG("[TIME]: %.4f seconds for SLAM update (%d feats)", time_slam_update, (int)feats_slam_UPDATE.size());
-        ROS_DEBUG("[TIME]: %.4f seconds for SLAM delayed init (%d feats)", time_slam_delay, (int)feats_slam_DELAYED.size());
+        ROS_DEBUG_THROTTLE(3, "[TIME]: %.4f seconds for SLAM update (%d feats) (Debug is throttled: 3s)", time_slam_update, (int)feats_slam_UPDATE.size());
+        ROS_DEBUG_THROTTLE(3, "[TIME]: %.4f seconds for SLAM delayed init (%d feats) (Debug is throttled: 3s)", time_slam_delay, (int)feats_slam_DELAYED.size());
     }
-//    printf(BLUE "[TIME]: %.4f seconds for marginalization (%d clones in state)\n" RESET, time_marg, (int)state->_clones_IMU.size());
-//    printf(BLUE "[TIME]: %.4f seconds for total\n" RESET, time_total);
-    ROS_DEBUG("[TIME]: %.4f seconds for marginalization (%d clones in state)", time_marg, (int)state->_clones_IMU.size());
-    ROS_DEBUG("[TIME]: %.4f seconds for total", time_total);
+    ROS_DEBUG_THROTTLE(3, "[TIME]: %.4f seconds for marginalization (%d clones in state) (Debug is throttled: 3s)", time_marg, (int)state->_clones_IMU.size());
+    ROS_DEBUG_THROTTLE(3, "[TIME]: %.4f seconds for total (Debug is throttled: 3s)", time_total);
 
     // Finally if we are saving stats to file, lets save it to file
     if(params.record_timing_information && of_statistics.is_open()) {
@@ -682,34 +675,24 @@ void VioManager::do_feature_propagate_update(double timestamp) {
     timelastupdate = timestamp;
 
     // Debug, print our current state
-//    printf("q_GtoI = %.3f,%.3f,%.3f,%.3f | p_IinG = %.3f,%.3f,%.3f | dist = %.2f (meters)\n",
-//            state->_imu->quat()(0),state->_imu->quat()(1),state->_imu->quat()(2),state->_imu->quat()(3),
-//            state->_imu->pos()(0),state->_imu->pos()(1),state->_imu->pos()(2),distance);
-    ROS_DEBUG("q_GtoI = %.3f,%.3f,%.3f,%.3f | p_IinG = %.3f,%.3f,%.3f | dist = %.2f (meters)",
+    ROS_DEBUG_THROTTLE(3, "q_GtoI = %.3f,%.3f,%.3f,%.3f | p_IinG = %.3f,%.3f,%.3f | dist = %.2f (meters) (Debug is throttled: 3s)",
          state->_imu->quat()(0),state->_imu->quat()(1),state->_imu->quat()(2),state->_imu->quat()(3),
          state->_imu->pos()(0),state->_imu->pos()(1),state->_imu->pos()(2),distance);
-//    printf("bg = %.4f,%.4f,%.4f | ba = %.4f,%.4f,%.4f\n",
-//             state->_imu->bias_g()(0),state->_imu->bias_g()(1),state->_imu->bias_g()(2),
-//             state->_imu->bias_a()(0),state->_imu->bias_a()(1),state->_imu->bias_a()(2));
-    ROS_DEBUG("bg = %.4f,%.4f,%.4f | ba = %.4f,%.4f,%.4f",
+    ROS_DEBUG_THROTTLE(3, "bg = %.4f,%.4f,%.4f | ba = %.4f,%.4f,%.4f (Debug is throttled: 3s)",
          state->_imu->bias_g()(0),state->_imu->bias_g()(1),state->_imu->bias_g()(2),
          state->_imu->bias_a()(0),state->_imu->bias_a()(1),state->_imu->bias_a()(2));
 
 
     // Debug for camera imu offset
     if(state->_options.do_calib_camera_timeoffset) {
-        // printf("camera-imu timeoffset = %.5f\n",state->_calib_dt_CAMtoIMU->value()(0));
-        ROS_DEBUG("camera-imu timeoffset = %.5f",state->_calib_dt_CAMtoIMU->value()(0));
+        ROS_DEBUG_THROTTLE(3, "camera-imu time-offset = %.5f (Debug is throttled: 3s)",state->_calib_dt_CAMtoIMU->value()(0));
     }
 
     // Debug for camera intrinsics
     if(state->_options.do_calib_camera_intrinsics) {
         for(int i=0; i<state->_options.num_cameras; i++) {
             Vec* calib = state->_cam_intrinsics.at(i);
-//            printf("cam%d intrinsics = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f,%.3f\n",(int)i,
-//                     calib->value()(0),calib->value()(1),calib->value()(2),calib->value()(3),
-//                     calib->value()(4),calib->value()(5),calib->value()(6),calib->value()(7));
-            ROS_DEBUG("cam%d intrinsics = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f,%.3f",(int)i,
+            ROS_DEBUG_THROTTLE(3, "cam%d intrinsics = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f,%.3f (Debug is throttled: 3s)",(int)i,
                  calib->value()(0),calib->value()(1),calib->value()(2),calib->value()(3),
                  calib->value()(4),calib->value()(5),calib->value()(6),calib->value()(7));
         }
@@ -719,18 +702,13 @@ void VioManager::do_feature_propagate_update(double timestamp) {
     if(state->_options.do_calib_camera_pose) {
         for(int i=0; i<state->_options.num_cameras; i++) {
             PoseJPL* calib = state->_calib_IMUtoCAM.at(i);
-//            printf("cam%d extrinsics = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f\n",(int)i,
-//                     calib->quat()(0),calib->quat()(1),calib->quat()(2),calib->quat()(3),
-//                     calib->pos()(0),calib->pos()(1),calib->pos()(2));
-            ROS_DEBUG("cam%d extrinsics = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f",(int)i,
+            ROS_DEBUG_THROTTLE(3, "cam%d extrinsic = %.3f,%.3f,%.3f,%.3f | %.3f,%.3f,%.3f (Debug is throttled: 3s)",(int)i,
                  calib->quat()(0),calib->quat()(1),calib->quat()(2),calib->quat()(3),
                  calib->pos()(0),calib->pos()(1),calib->pos()(2));
         }
     }
     // Todo (GZ): think of a better way to have clean ROS debug output.
-    ROS_DEBUG("====================================================================================================");
-
-
+    ROS_DEBUG_THROTTLE(3, "====================================================================================================");
 
 }
 

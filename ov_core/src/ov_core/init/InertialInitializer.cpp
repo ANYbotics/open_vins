@@ -43,6 +43,7 @@ void InertialInitializer::feed_imu(double timestamp, Eigen::Matrix<double,3,1> w
         while (it0 != imu_data.end() && it0->timestamp < timestamp - (2 * _initialization_window_length)) {
             it0 = imu_data.erase(it0);
         }
+        ROS_DEBUG_STREAM_THROTTLE(3, "The number of IMU measurements collected for initialization is: " << imu_data.size() << " (Throttled: 3s).");
     }
 
 }
@@ -79,6 +80,7 @@ bool InertialInitializer::obtain_initialization_window(double & window_start, do
         int contact_data_latest_index = contact_data_size - 1;
         double initialization_start_timestamp = contact_data[contact_data_latest_index].timestamp - initialization_window_length;
         bool is_in_consecutive_contact = true;
+        // todo(GZ): Notice here the number of checked contact data might be very small due to the message dropout.
         while (contact_data[contact_data_latest_index].timestamp >= initialization_start_timestamp) {
             is_in_consecutive_contact &= contact_data[contact_data_latest_index--].is_in_contact;
             if (!is_in_consecutive_contact) {
@@ -112,13 +114,20 @@ bool InertialInitializer::fetch_imu_data_for_initialization(std::vector<IMUDATA>
     for(auto iter = imu_data.rbegin(); iter!=imu_data.rend(); iter++) {
         if(iter->timestamp > valid_window_start_time && iter->timestamp < valid_window_end_time) {
             valid_imu_measurements_window.push_back(*iter);
-            if (imu_measurements_counter++ >= num_valid_imu_measurements_threshold)
+            if (imu_measurements_counter++ >= num_valid_imu_measurements_threshold) {
                 return true;
+            }
         }
     }
 
     // Return false if there is not enough "valid" IMU measurements.
-    ROS_WARN_THROTTLE(1, "Not enough valid IMU measurements in the initialization window. (Warning is throttled: 1s)");
+    ROS_WARN_THROTTLE(1, "Not enough valid IMU measurements %d/%d in the initialization window (Warning is throttled: 1s)", imu_measurements_counter, num_valid_imu_measurements_threshold);
+    if (!valid_imu_measurements_window.empty()) {
+        ROS_WARN_STREAM_THROTTLE(1,
+                                 "The initialization window time at the end minus the timestamp of the latest selected IMU measurement is "
+                                     << valid_window_end_time - valid_imu_measurements_window.begin()->timestamp
+                                     << " (Warning is throttled: 1s).");
+    }
     return false;
 }
 

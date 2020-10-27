@@ -41,7 +41,7 @@ void TrackKLT::feed_monocular(double timestamp, cv::Mat &img, size_t cam_id) {
     rT2 =  boost::posix_time::microsec_clock::local_time();
 
     // If we didn't have any successful tracks last time, just extract this time
-    // This also handles, the tracking initalization on the first call to this extractor
+    // This also handles, the tracking initialization on the first call to this extractor
     if(pts_last[cam_id].empty()) {
         // Detect new features
         perform_detection_monocular(imgpyr, pts_last[cam_id], ids_last[cam_id]);

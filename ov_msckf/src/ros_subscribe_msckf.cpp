@@ -21,15 +21,16 @@
 
 
 #include <ros/ros.h>
-#include <rosbag/bag.h>
-#include <rosbag/view.h>
+#include <ros/callback_queue.h>
+#include <ros/spinner.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/Imu.h>
-#include <std_msgs/Float64.h>
 #include <cv_bridge/cv_bridge.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
+
+#include <boost/date_time/microsec_time_clock.hpp>
 
 #include "core/VioManager.h"
 #include "core/VioManagerOptions.h"
@@ -67,6 +68,11 @@ int main(int argc, char** argv) {
     // Launch our ros node
     ros::init(argc, argv, "visual_inertial_odometry");
     ros::NodeHandle nh("~");
+    ros::NodeHandle imageNh;
+    // Use a separate callback queue for images input so that the system can achieve real-time performance.
+    ros::CallbackQueue imageCallbackQueue;
+    imageNh.setCallbackQueue(&imageCallbackQueue);
+
 
     // Create our VIO system. Read parameters from ROS parameter server.
     VioManagerOptions params = parse_ros_nodehandler(nh);
@@ -87,9 +93,9 @@ int main(int argc, char** argv) {
 
     // Logic for sync stereo subscriber
     // https://answers.ros.org/question/96346/subscribe-to-two-image_raws-with-one-function/?answer=96491#post-id-96491
-    message_filters::Subscriber<sensor_msgs::Image> image_sub1(nh, param_io::param<std::string>(nh, "subscribers/" + camera_input_1 + "/topic", camera_input_1),
+    message_filters::Subscriber<sensor_msgs::Image> image_sub1(imageNh, param_io::param<std::string>(nh, "subscribers/" + camera_input_1 + "/topic", camera_input_1),
                                                                param_io::param<uint32_t>(nh, "subscribers/" + camera_input_1 + "/queue_size", 1));
-    message_filters::Subscriber<sensor_msgs::Image> image_sub2(nh,param_io::param<std::string>(nh, "subscribers/" + camera_input_2 + "/topic", camera_input_2),
+    message_filters::Subscriber<sensor_msgs::Image> image_sub2(imageNh,param_io::param<std::string>(nh, "subscribers/" + camera_input_2 + "/topic", camera_input_2),
                                                                param_io::param<uint32_t>(nh, "subscribers/" + camera_input_2 + "/queue_size", 1));
     //message_filters::TimeSynchronizer<sensor_msgs::Image,sensor_msgs::Image> sync(image_sub0,image_sub1,5);
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
@@ -116,7 +122,7 @@ int main(int argc, char** argv) {
     ros::Subscriber subcam;
     if(params.state_options.num_cameras == 1) {
         ROS_INFO("subscribing to: %s", param_io::param<std::string>(nh, "subscribers/" + camera_input_1 + "/topic", camera_input_1).c_str());
-        subcam = nh.subscribe(param_io::param<std::string>(nh, "subscribers/" + camera_input_1 + "/topic", camera_input_1),
+        subcam = imageNh.subscribe(param_io::param<std::string>(nh, "subscribers/" + camera_input_1 + "/topic", camera_input_1),
                               param_io::param<uint32_t>(nh, "subscribers/" + camera_input_1 + "/queue_size", 1), callback_monocular);
     } else if(params.state_options.num_cameras == 2) {
         ROS_INFO("subscribing to: %s", param_io::param<std::string>(nh, "subscribers/" + camera_input_1 + "/topic", camera_input_1).c_str());
@@ -133,7 +139,14 @@ int main(int argc, char** argv) {
 
     // Spin off to ROS
     ROS_INFO("Finish setting up subscribers.");
-    ros::spin();
+
+    ros::AsyncSpinner spinner(2);
+    spinner.start();
+
+    ros::AsyncSpinner imageSpinner(2, &imageCallbackQueue);
+    imageSpinner.start();
+
+    ros::waitForShutdown();
 
     // Final visualization
     viz->visualize_final();
@@ -212,7 +225,7 @@ void callback_monocular(const sensor_msgs::ImageConstPtr& msg0) {
 
 
 void callback_stereo(const sensor_msgs::ImageConstPtr& msg0, const sensor_msgs::ImageConstPtr& msg1) {
-
+    auto rT1 =  boost::posix_time::microsec_clock::local_time();
     // Get the image
     cv_bridge::CvImageConstPtr cv_ptr0;
     try {
@@ -250,6 +263,11 @@ void callback_stereo(const sensor_msgs::ImageConstPtr& msg0, const sensor_msgs::
     img0_buffer = cv_ptr0->image.clone();
     time_buffer = cv_ptr1->header.stamp.toSec();
     img1_buffer = cv_ptr1->image.clone();
+
+    // Get timing statistics information
+    auto rT2 =  boost::posix_time::microsec_clock::local_time();
+    double time_track = (rT2-rT1).total_microseconds() * 1e-6;
+    ROS_DEBUG_THROTTLE(3, "[TIME]: %.4f seconds for image callback (Debug is throttled: 3s)", time_track);
 
 }
 

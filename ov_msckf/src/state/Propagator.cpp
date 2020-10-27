@@ -19,6 +19,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "Propagator.h"
+#include <ros/console.h>
 
 
 
@@ -265,8 +266,9 @@ std::vector<Propagator::IMUDATA> Propagator::select_imu_readings(const std::vect
     // Loop through and ensure we do not have an zero dt values
     // This would cause the noise covariance to be Infinity
     for (size_t i=0; i < prop_data.size()-1; i++) {
-        if (std::abs(prop_data.at(i+1).timestamp-prop_data.at(i).timestamp) < 1e-12) {
-            printf(YELLOW "Propagator::select_imu_readings(): Zero DT between IMU reading %d and %d, removing it!\n" RESET, (int)i, (int)(i+1));
+        auto time_diff = std::abs(prop_data.at(i+1).timestamp-prop_data.at(i).timestamp);
+        if (time_diff < 1e-12) {
+            ROS_WARN_THROTTLE(3, "IMU measurements selection: close to zero DT (%f / 1e-12) between IMU reading %d and %d, removing it. (Throttled: 3s)", time_diff, static_cast<int>(i), static_cast<int>(i+1));
             prop_data.erase(prop_data.begin()+i);
             i--;
         }
@@ -274,7 +276,7 @@ std::vector<Propagator::IMUDATA> Propagator::select_imu_readings(const std::vect
 
     // Check that we have at least one measurement to propagate with
     if(prop_data.size() < 2) {
-        printf(YELLOW "Propagator::select_imu_readings(): No IMU measurements to propagate with (%d of 2). IMU-CAMERA are likely messed up!!!\n" RESET, (int)prop_data.size());
+        ROS_WARN_THROTTLE(3, "No IMU measurements to propagate with (%d of 2). IMU-CAMERA are likely messed up. (Throttled: 3s)", (int)prop_data.size());
         return prop_data;
     }
 
