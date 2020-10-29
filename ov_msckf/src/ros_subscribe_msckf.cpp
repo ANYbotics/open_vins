@@ -243,7 +243,8 @@ void callback_stereo(const sensor_msgs::ImageConstPtr& msg0, const sensor_msgs::
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
-
+    auto time_diff = abs(cv_ptr1->header.stamp.toSec()-cv_ptr0->header.stamp.toSec());
+    ROS_DEBUG_THROTTLE(3, "The timestamp difference of the synchronized image pair is: %f s (Throttled: 3s)", time_diff);
 
     // Fill our buffer if we have not
     if(img0_buffer.rows == 0 || img1_buffer.rows == 0) {

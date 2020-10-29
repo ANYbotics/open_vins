@@ -162,11 +162,13 @@ bool InertialInitializer::initialize_with_imu(double &time0, Eigen::Matrix<doubl
     }
     a_var = std::sqrt(a_var/(initialization_imu_window.size()-1));
 
-    ROS_DEBUG_THROTTLE(1, "IMU acceleration variance in the initialization time window: %.4f (Debugging is throttled: 1s)", a_var);
+    ROS_DEBUG_THROTTLE(1, "IMU acceleration variance in the initialization time window (window size: %lu): %.4f (Debugging is throttled: 1s)",
+                       initialization_imu_window.size(), a_var);
 
     // If acceleration variance is above the threshold, this means the agent is not standstill. Return false.
     if(a_var > _imu_init_threshold ) {
-      ROS_WARN_THROTTLE(1, "Too much IMU acceleration variance detected in the initialization time window, above the threshold %.4f > %.4f (Warning is throttled: 1s)", a_var, _imu_init_threshold);
+      ROS_WARN_THROTTLE(1, "Too much IMU acceleration variance detected in the initialization time window (window size: %lu), "
+                        "above the threshold %.4f > %.4f (Warning is throttled: 1s)", initialization_imu_window.size(), a_var, _imu_init_threshold);
       return false;
     }
 
