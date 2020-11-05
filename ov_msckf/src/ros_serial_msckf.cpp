@@ -52,8 +52,8 @@ int main(int argc, char** argv)
 
     // Create our VIO system
     VioManagerOptions params = parse_ros_nodehandler(nh);
-    sys = new VioManager(params);
-    viz = new RosVisualizer(nh, sys);
+    std::shared_ptr<VioManager> sys = std::make_shared<VioManager>(params);
+    std::unique_ptr<RosVisualizer> viz = std::make_unique<RosVisualizer>(nh, sys);
 
 
     //===================================================================================
@@ -235,7 +235,6 @@ int main(int argc, char** argv)
             img0_buffer = img0.clone();
         }
 
-
         // If we are in stereo mode and have both left and right, then process
         if(max_cameras==2 && has_left && has_right) {
             // process once we have initialized with the GT
@@ -262,10 +261,6 @@ int main(int argc, char** argv)
 
     // Final visualization
     viz->visualize_final();
-
-    // Finally delete our system
-    delete sys;
-    delete viz;
 
 
     // Done!

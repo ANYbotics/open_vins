@@ -124,10 +124,10 @@ namespace ov_core {
          * @param valid_imu_measurements_window The vector to store the fetched valid IMU measurements
          * @param initialization_window_length The initialization time length (Unit: second)
          * @param num_valid_imu_measurements_threshold The threshold number of the valid IMU measurements needed for initialization
-         * @param consider_contact Whether to consider contact when fetching valid IMU measurements needed for initialization
+         * @param use_contact Whether to consider contact when fetching valid IMU measurements needed for initialization
          * @return True if fetching enough valid IMU measurements
          */
-        bool fetch_imu_data_for_initialization(std::vector<IMUDATA>& valid_imu_measurements_window, double initialization_window_length, int num_valid_imu_measurements_threshold, bool consider_contact);
+        bool fetch_imu_data_for_initialization(std::vector<IMUDATA>& valid_imu_measurements_window, double initialization_window_length, int num_valid_imu_measurements_threshold, bool use_contact);
 
 
         /**
@@ -147,11 +147,11 @@ namespace ov_core {
          * @param[out] v_I0inG Velocity at initialization
          * @param[out] b_a0 Acceleration bias at initialization
          * @param[out] p_I0inG Position at initialization
-         * @param consider_contact True to start initialization only when the agent is in contact with the ground
+         * @param use_contact True to start initialization only when the agent is in contact with the ground
          * @return True if we have successfully initialized our system
          */
         bool initialize_with_imu(double &time0, Eigen::Matrix<double,4,1> &q_GtoI0, Eigen::Matrix<double,3,1> &b_w0,
-                                 Eigen::Matrix<double,3,1> &v_I0inG, Eigen::Matrix<double,3,1> &b_a0, Eigen::Matrix<double,3,1> &p_I0inG, bool consider_contact=true);
+                                 Eigen::Matrix<double,3,1> &v_I0inG, Eigen::Matrix<double,3,1> &b_a0, Eigen::Matrix<double,3,1> &p_I0inG, bool use_contact=true);
 
 
     protected:

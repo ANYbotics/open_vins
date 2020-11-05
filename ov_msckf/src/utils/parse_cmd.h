@@ -60,6 +60,7 @@ namespace ov_msckf {
         app1.add_option("--max_msckf_in_update", params.state_options.max_msckf_in_update, "");
         app1.add_option("--max_aruco", params.state_options.max_aruco_features, "");
         app1.add_option("--max_cameras", params.state_options.num_cameras, "");
+        app1.add_option("--cameras_to_use", params.state_options.camera_id_to_use_vec, "");
         app1.add_option("--dt_slam_delay", params.dt_slam_delay, "");
 
         // Read in what representation our feature is

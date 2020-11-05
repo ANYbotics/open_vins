@@ -99,13 +99,13 @@ bool InertialInitializer::obtain_initialization_window(double & window_start, do
     return true;
 }
 
-bool InertialInitializer::fetch_imu_data_for_initialization(std::vector<IMUDATA>& valid_imu_measurements_window, double initialization_window_length, int num_valid_imu_measurements_threshold, bool consider_contact){
+bool InertialInitializer::fetch_imu_data_for_initialization(std::vector<IMUDATA>& valid_imu_measurements_window, double initialization_window_length, int num_valid_imu_measurements_threshold, bool use_contact){
     std::lock_guard<std::mutex> lock1(imu_data_mutex_);
     std::lock_guard<std::mutex> lock2(contact_data_mutex_);
 
     double valid_window_start_time = 0;
     double valid_window_end_time = 0;
-    if (!obtain_initialization_window(valid_window_start_time, valid_window_end_time, consider_contact, initialization_window_length))
+    if (!obtain_initialization_window(valid_window_start_time, valid_window_end_time, use_contact, initialization_window_length))
     {
         return false;
     }
@@ -114,7 +114,8 @@ bool InertialInitializer::fetch_imu_data_for_initialization(std::vector<IMUDATA>
     for(auto iter = imu_data.rbegin(); iter!=imu_data.rend(); iter++) {
         if(iter->timestamp > valid_window_start_time && iter->timestamp < valid_window_end_time) {
             valid_imu_measurements_window.push_back(*iter);
-            if (imu_measurements_counter++ >= num_valid_imu_measurements_threshold) {
+            ++imu_measurements_counter;
+            if (imu_measurements_counter >= num_valid_imu_measurements_threshold) {
                 return true;
             }
         }
@@ -132,11 +133,11 @@ bool InertialInitializer::fetch_imu_data_for_initialization(std::vector<IMUDATA>
 }
 
 bool InertialInitializer::initialize_with_imu(double &time0, Eigen::Matrix<double,4,1> &q_GtoI0, Eigen::Matrix<double,3,1> &b_w0,
-                                              Eigen::Matrix<double,3,1> &v_I0inG, Eigen::Matrix<double,3,1> &b_a0, Eigen::Matrix<double,3,1> &p_I0inG, bool consider_contact) {
+                                              Eigen::Matrix<double,3,1> &v_I0inG, Eigen::Matrix<double,3,1> &b_a0, Eigen::Matrix<double,3,1> &p_I0inG, bool use_contact) {
 
     std::vector<IMUDATA> initialization_imu_window;
 
-    if (!fetch_imu_data_for_initialization(initialization_imu_window, _initialization_window_length, _imu_init_num_of_imu_measurements, consider_contact)) {
+    if (!fetch_imu_data_for_initialization(initialization_imu_window, _initialization_window_length, _imu_init_num_of_imu_measurements, use_contact)) {
         return false;
     }
 

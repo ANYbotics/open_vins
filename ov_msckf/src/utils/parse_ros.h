@@ -56,6 +56,7 @@ namespace ov_msckf {
         nh.param<int>("max_msckf_in_update", params.state_options.max_msckf_in_update, params.state_options.max_msckf_in_update);
         nh.param<int>("max_aruco", params.state_options.max_aruco_features, params.state_options.max_aruco_features);
         nh.param<int>("max_cameras", params.state_options.num_cameras, params.state_options.num_cameras);
+        nh.param<std::vector<int>>("cameras_to_use", params.state_options.camera_id_to_use_vec, params.state_options.camera_id_to_use_vec);
         nh.param<double>("dt_slam_delay", params.dt_slam_delay, params.dt_slam_delay);
 
         // Enforce that we have enough cameras to run

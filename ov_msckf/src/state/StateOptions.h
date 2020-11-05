@@ -69,6 +69,9 @@ namespace ov_msckf {
         /// Number of cameras
         int num_cameras = 1;
 
+        /// Which cameras to use for VIO
+        std::vector<int> camera_id_to_use_vec{0};
+
         /// What representation our features are in (msckf features)
         LandmarkRepresentation::Representation feat_rep_msckf = LandmarkRepresentation::Representation::GLOBAL_3D;
 
@@ -92,6 +95,11 @@ namespace ov_msckf {
             printf("\t- max_msckf_in_update: %d\n", max_msckf_in_update);
             printf("\t- max_aruco: %d\n", max_aruco_features);
             printf("\t- max_cameras: %d\n", num_cameras);
+            std::string camera_ids_to_use = "";
+            for (auto camera_id: camera_id_to_use_vec){
+                camera_ids_to_use += std::__cxx11::to_string(camera_id)+ ", ";
+            }
+            printf("\t- cameras used for VIO are: %s\n", camera_ids_to_use.c_str());
             printf("\t- feat_rep_msckf: %s\n", LandmarkRepresentation::as_string(feat_rep_msckf).c_str());
             printf("\t- feat_rep_slam: %s\n", LandmarkRepresentation::as_string(feat_rep_slam).c_str());
             printf("\t- feat_rep_aruco: %s\n", LandmarkRepresentation::as_string(feat_rep_aruco).c_str());

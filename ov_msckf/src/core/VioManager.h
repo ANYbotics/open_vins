@@ -27,6 +27,7 @@
 #include <fstream>
 #include <Eigen/StdVector>
 #include <boost/filesystem.hpp>
+#include <opencv2/core/mat.hpp>
 
 #include <ov_core/track/TrackAruco.h>
 #include <ov_core/track/TrackDescriptor.h>
@@ -94,6 +95,19 @@ namespace ov_msckf {
          */
         void feed_measurement_monocular(double timestamp, cv::Mat& img0, size_t cam_id);
 
+        /**
+         * @brief Feed function for stereo camera pair with image synchronization check
+         * @param image_timestamp_buffer_map The image timestamp map (camera id, timestamp)
+         * @param image_mat_buffer_map The image data map (camera id, image data)
+         * @param cam_id0 Unique id of the first camera
+         * @param cam_id1 Unique id of the second camera
+         * @param image_sync_time_diff_tolerance The maximum allowed timestamp difference among a synced image-pair. Unit: second.
+         */
+        void feed_measurement_stereo(std::map<unsigned int, double> &image_timestamp_buffer_map,
+                                     std::map<unsigned int, cv::Mat> &image_mat_buffer_map,
+                                     size_t cam_id0,
+                                     size_t cam_id1,
+                                     const double image_sync_time_diff_tolerance);
         /**
          * @brief Feed function for stereo camera pair
          * @param timestamp Time that this image was collected

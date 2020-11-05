@@ -21,7 +21,7 @@
 #include "RosVisualizer.h"
 
 // utils ros_transport
-#include "../utils/ros_transport.hpp"
+#include "../utils/ros_transport.h"
 
 // param io
 #include <param_io/get_param.hpp>
@@ -31,7 +31,7 @@ using namespace ov_msckf;
 
 
 
-RosVisualizer::RosVisualizer(ros::NodeHandle &nh, VioManager* app, Simulator *sim) : _nh(nh), _it(nh), _app(app), _sim(sim) {
+RosVisualizer::RosVisualizer(ros::NodeHandle &nh, std::shared_ptr<VioManager> app, Simulator *sim) : _nh(nh), _it(nh), _app(app), _sim(sim) {
 
 
 

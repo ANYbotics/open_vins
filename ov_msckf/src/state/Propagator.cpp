@@ -61,7 +61,7 @@ void Propagator::propagate_and_clone(State* state, double timestamp) {
     // First lets construct an IMU vector of measurements we need
     double time0 = state->_timestamp+last_prop_time_offset;
     double time1 = timestamp+t_off_new;
-    vector<IMUDATA> prop_data = Propagator::select_imu_readings(imu_data,time0,time1);
+    vector<IMUDATA> imu_propagation_data = Propagator::select_imu_readings(imu_data, time0, time1);
 
     // We are going to sum up all the state transition matrices, so we can do a single large multiplication at the end
     // Phi_summed = Phi_i*Phi_summed
@@ -74,13 +74,13 @@ void Propagator::propagate_and_clone(State* state, double timestamp) {
 
     // Loop through all IMU messages, and use them to move the state forward in time
     // This uses the zero'th order quat, and then constant acceleration discrete
-    if(prop_data.size() > 1) {
-        for(size_t i=0; i<prop_data.size()-1; i++) {
+    if(imu_propagation_data.size() > 1) {
+        for(size_t i=0; i<imu_propagation_data.size()-1; i++) {
 
             // Get the next state Jacobian and noise Jacobian for this IMU reading
             Eigen::Matrix<double, 15, 15> F = Eigen::Matrix<double, 15, 15>::Zero();
             Eigen::Matrix<double, 15, 15> Qdi = Eigen::Matrix<double, 15, 15>::Zero();
-            predict_and_compute(state, prop_data.at(i), prop_data.at(i+1), F, Qdi);
+            predict_and_compute(state, imu_propagation_data.at(i), imu_propagation_data.at(i+1), F, Qdi);
 
             // Next we should propagate our IMU covariance
             // Pii' = F*Pii*F.transpose() + G*Q*G.transpose()
@@ -91,14 +91,14 @@ void Propagator::propagate_and_clone(State* state, double timestamp) {
             Phi_summed = F * Phi_summed;
             Qd_summed = F * Qd_summed * F.transpose() + Qdi;
             Qd_summed = 0.5*(Qd_summed+Qd_summed.transpose());
-            dt_summed += prop_data.at(i+1).timestamp-prop_data.at(i).timestamp;
+            dt_summed += imu_propagation_data.at(i+1).timestamp-imu_propagation_data.at(i).timestamp;
         }
     }
 
     // Last angular velocity (used for cloning when estimating time offset)
     Eigen::Matrix<double,3,1> last_w = Eigen::Matrix<double,3,1>::Zero();
-    if(prop_data.size() > 1) last_w = prop_data.at(prop_data.size()-2).wm - state->_imu->bias_g();
-    else if(!prop_data.empty()) last_w = prop_data.at(prop_data.size()-1).wm - state->_imu->bias_g();
+    if(imu_propagation_data.size() > 1) last_w = imu_propagation_data.at(imu_propagation_data.size()-2).wm - state->_imu->bias_g();
+    else if(!imu_propagation_data.empty()) last_w = imu_propagation_data.at(imu_propagation_data.size()-1).wm - state->_imu->bias_g();
 
     // Do the update to the covariance with our "summed" state transition and IMU noise addition...
     std::vector<Type*> Phi_order;

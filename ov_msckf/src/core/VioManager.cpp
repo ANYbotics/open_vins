@@ -278,6 +278,81 @@ void VioManager::feed_measurement_stereo(double timestamp, cv::Mat& img0, cv::Ma
 
 }
 
+void VioManager::feed_measurement_stereo(std::map<unsigned int, double> &image_timestamp_buffer_map,
+                                         std::map<unsigned int, cv::Mat> &image_mat_buffer_map,
+                                         size_t cam_id0,
+                                         size_t cam_id1,
+                                         const double image_sync_time_diff_tolerance) {
+
+    // Start timing
+    rT1 =  boost::posix_time::microsec_clock::local_time();
+
+    // Assert we have good ids
+    assert(cam_id0!=cam_id1);
+
+    // Downsample if we are downsampling
+    cv::Mat img0, img1;
+    if(params.downsample_cameras) {
+        cv::Mat img0_temp, img1_temp;
+        cv::pyrDown(image_mat_buffer_map[cam_id0],img0_temp,cv::Size(image_mat_buffer_map[cam_id0].cols/2.0,image_mat_buffer_map[cam_id0].rows/2.0));
+        cv::pyrDown(image_mat_buffer_map[cam_id1],img1_temp,cv::Size(image_mat_buffer_map[cam_id1].cols/2.0,image_mat_buffer_map[cam_id1].rows/2.0));
+        img0 = img0_temp.clone();
+        img1 = img1_temp.clone();
+    }
+
+    // Check if we should do zero-velocity, if so update the state with it
+    if(is_initialized_vio && updaterZUPT != nullptr) {
+        // Use the timestamp from the first image as a reference.
+        did_zupt_update = updaterZUPT->try_update(state, image_timestamp_buffer_map[cam_id0]);
+        if(did_zupt_update) {
+            cv::Mat img_outtemp0, img_outtemp1;
+            cv::cvtColor(img0, img_outtemp0, cv::COLOR_GRAY2RGB);
+            cv::cvtColor(img1, img_outtemp1, cv::COLOR_GRAY2RGB);
+            const bool is_small = (std::min(img0.cols,img0.rows) < 400);
+            const auto txtpt = (is_small)? cv::Point(10,30) : cv::Point(30,60);
+            cv::putText(img_outtemp0, "zvup active", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,0,255),3);
+            cv::putText(img_outtemp1, "zvup active", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,0,255),3);
+            cv::hconcat(img_outtemp0, img_outtemp1, zupt_image);
+            return;
+        }
+    }
+
+    const auto time_diff = abs(image_timestamp_buffer_map[cam_id0]-image_timestamp_buffer_map[cam_id1]);
+    if (time_diff > image_sync_time_diff_tolerance) {
+        ROS_WARN_THROTTLE(10, "The timestamp difference of the synchronized image pair is too much: %fs/%fs. System will not be updated (Throttled: 10s).", time_diff, image_sync_time_diff_tolerance);
+        return;
+    }
+
+    // Feed our stereo trackers, if we are not doing binocular
+    if(params.use_stereo) {
+        trackFEATS->feed_stereo(image_timestamp_buffer_map[cam_id0], img0, img1, cam_id0, cam_id1);
+    } else {
+        boost::thread t_l = boost::thread(&TrackBase::feed_monocular, trackFEATS, boost::ref(image_timestamp_buffer_map[cam_id0]), boost::ref(img0), boost::ref(cam_id0));
+        boost::thread t_r = boost::thread(&TrackBase::feed_monocular, trackFEATS, boost::ref(image_timestamp_buffer_map[cam_id0]), boost::ref(img1), boost::ref(cam_id1));
+        t_l.join();
+        t_r.join();
+    }
+
+    // If aruoc is avalible, the also pass to it
+    // NOTE: binocular tracking for aruco doesn't make sense as we by default have the ids
+    // NOTE: thus we just call the stereo tracking if we are doing binocular!
+    if(trackARUCO != nullptr) {
+        trackARUCO->feed_stereo(image_timestamp_buffer_map[cam_id0], img0, img1, cam_id0, cam_id1);
+    }
+    rT2 =  boost::posix_time::microsec_clock::local_time();
+
+    // If we do not have VIO initialization, then try to initialize
+    // TODO: Or if we are trying to reset the system, then do that here!
+    if(!is_initialized_vio) {
+        is_initialized_vio = try_to_initialize();
+        if(!is_initialized_vio) return;
+    }
+
+    // Call on our propagate and update function
+    do_feature_propagate_update(image_timestamp_buffer_map[cam_id0]);
+
+}
+
 
 
 void VioManager::feed_measurement_simulation(double timestamp, const std::vector<int> &camids, const std::vector<std::vector<std::pair<size_t,Eigen::VectorXf>>> &feats) {
@@ -346,7 +421,10 @@ bool VioManager::try_to_initialize() {
     // Returns from our initializer
     double time0;
     Eigen::Matrix<double, 4, 1> q_GtoI0;
-    Eigen::Matrix<double, 3, 1> b_w0, v_I0inG, b_a0, p_I0inG;
+    Eigen::Matrix<double, 3, 1> b_w0;
+    Eigen::Matrix<double, 3, 1> v_I0inG;
+    Eigen::Matrix<double, 3, 1> b_a0;
+    Eigen::Matrix<double, 3, 1> p_I0inG;
 
     bool success = initializer->initialize_with_imu(time0, q_GtoI0, b_w0, v_I0inG, b_a0, p_I0inG, params.use_contact_for_initialization);
 
@@ -397,7 +475,7 @@ void VioManager::do_feature_propagate_update(double timestamp) {
 
     // Return if the camera measurement is out of order
     if(state->_timestamp >= timestamp) {
-        printf(YELLOW "image received out of order (prop dt = %3f)\n" RESET,(timestamp-state->_timestamp));
+        ROS_WARN("Image received is late than the current state by %.6f s", (state->_timestamp - timestamp));
         return;
     }
 

@@ -51,7 +51,15 @@ bool UpdaterZeroVelocity::try_update(State *state, double timestamp) {
     // Select bounding inertial measurements
     // TODO(guoxiang): if there is a missing image in the stream, we will have a problem. Since the difference between time0 and time1 is too big.
     // std::vector<Propagator::IMUDATA> imu_recent = Propagator::select_imu_readings(imu_data, time0, time1);
-    std::vector<Propagator::IMUDATA> imu_recent = Propagator::select_imu_readings(imu_data, timestamp - _imu_zero_velocity_window_length, timestamp);
+    std::vector<Propagator::IMUDATA> imu_recent;
+    try {
+        imu_recent = Propagator::select_imu_readings(imu_data, timestamp - _imu_zero_velocity_window_length, timestamp);
+    }
+    catch (...) {
+        // todo (GZ): This exception is weird. Figure it out:)
+        ROS_INFO_STREAM("Cannot select imu readings");
+        return false;
+    }
 
     // Move forward in time
     last_prop_time_offset = t_off_new;

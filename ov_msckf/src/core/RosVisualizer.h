@@ -70,7 +70,7 @@ namespace ov_msckf {
          * @param app Core estimator manager
          * @param sim Simulator if we are simulating
          */
-        RosVisualizer(ros::NodeHandle &nh, VioManager* app, Simulator* sim=nullptr);
+        RosVisualizer(ros::NodeHandle &nh, std::shared_ptr<VioManager> app, Simulator* sim=nullptr);
 
 
         /**
@@ -118,7 +118,7 @@ namespace ov_msckf {
         image_transport::ImageTransport _it;
 
         /// Core application of the filter system
-        VioManager* _app;
+        std::shared_ptr<VioManager> _app;
 
         /// Simulator (is nullptr if we are not sim'ing)
         Simulator* _sim;

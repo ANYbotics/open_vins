@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.5.1)
 # Project name
 project(ov_msckf)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 add_compile_options(-Wall -Wextra -Wpedantic)
 
 ## Export compile commands for clang.
@@ -67,6 +67,7 @@ add_library(${PROJECT_NAME}
   src/update/UpdaterMSCKF.cpp
   src/update/UpdaterSLAM.cpp
   src/update/UpdaterZeroVelocity.cpp
+  src/utils/VisualInertialOdometryRos.cpp
 )
 
 add_dependencies(${PROJECT_NAME}
