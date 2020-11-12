@@ -45,8 +45,8 @@ bool UpdaterZeroVelocity::try_update(State *state, double timestamp) {
 
     // First lets construct an IMU vector of measurements we need
     //double time0 = state->_timestamp+t_off_new;
-    double time0 = state->_timestamp+last_prop_time_offset;
-    double time1 = timestamp+t_off_new;
+    //double time0 = state->_timestamp+last_prop_time_offset;
+    //double time1 = timestamp+t_off_new;
 
     // Select bounding inertial measurements
     // TODO(guoxiang): if there is a missing image in the stream, we will have a problem. Since the difference between time0 and time1 is too big.
