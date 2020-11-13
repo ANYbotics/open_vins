@@ -19,8 +19,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "VioManager.h"
+
 #include <ov_core/types/Landmark.h>
 #include <ros/console.h>
+#include <std_srvs/Empty.h>
 
 
 
@@ -135,6 +137,9 @@ VioManager::VioManager(VioManagerOptions& params_) {
 
 }
 
+VioManager::VioManager(VioManagerOptions& params_, ros::ServiceClient reset_client): VioManager(params_){
+    reset_service_client_ = std::move(reset_client);
+}
 
 void VioManager::feed_measurement_contact(double timestamp, bool is_in_contact) {
 
@@ -320,6 +325,7 @@ void VioManager::feed_measurement_stereo(std::map<unsigned int, double> &image_t
     const auto time_diff = abs(image_timestamp_buffer_map[cam_id0]-image_timestamp_buffer_map[cam_id1]);
     if (time_diff > image_sync_time_diff_tolerance) {
         ROS_WARN_THROTTLE(10, "The timestamp difference of the synchronized image pair is too much: %fs/%fs. System will not be updated (Throttled: 10s).", time_diff, image_sync_time_diff_tolerance);
+        // todo (GZ): `return here` might be the cause of warning `TF_REPEATED_DATA ignoring data with redundant timestamp for frame`
         return;
     }
 
@@ -488,11 +494,11 @@ void VioManager::do_feature_propagate_update(double timestamp) {
     // This isn't super ideal, but it keeps the logic after this easier...
     // We can start processing things when we have at least 5 clones (by pure IMU integration) since we can start triangulating things...
     if((int)state->_clones_IMU.size() < std::min(state->_options.max_clone_size,5)) {
-        ROS_INFO("Waiting for enough clone states (%d of %d)....",(int)state->_clones_IMU.size(),std::min(state->_options.max_clone_size,5));
+        ROS_DEBUG("Waiting for enough clone states (%d of %d)....",(int)state->_clones_IMU.size(),std::min(state->_options.max_clone_size,5));
         return;
     }
 
-    // Return if we where unable to propagate
+    // Return if we are unable to propagate
     if(state->_timestamp != timestamp) {
         printf(RED "[PROP]: Propagator unable to propagate the state forward in time!\n" RESET);
         printf(RED "[PROP]: It has been %.3f since last time we propagated\n" RESET,timestamp-state->_timestamp);
@@ -745,12 +751,21 @@ void VioManager::do_feature_propagate_update(double timestamp) {
     }
 
 
-    // Update our distance traveled
+    // Update our distance traveled and velocity
     if(timelastupdate != -1 && state->_clones_IMU.find(timelastupdate) != state->_clones_IMU.end()) {
         Eigen::Matrix<double,3,1> dx = state->_imu->pos() - state->_clones_IMU.at(timelastupdate)->pos();
-        distance += dx.norm();
+        const auto distance_delta = dx.norm();
+        // Compute inter-frame velocity via numerical derivative (dx/deltaTime)
+        velocity = distance_delta/(timestamp-timelastupdate);
+        distance += distance_delta;
+
     }
+
+    ROS_DEBUG_STREAM_THROTTLE(3, "The system velocity is " << std::fixed << velocity << " from " << timelastupdate << " to " << timestamp << " (Throttled: 3s).");
+
     timelastupdate = timestamp;
+
+    check_system_divergence();
 
     // Debug, print our current state
     ROS_DEBUG_THROTTLE(3, "q_GtoI = %.3f,%.3f,%.3f,%.3f | p_IinG = %.3f,%.3f,%.3f | dist = %.2f (meters) (Debug is throttled: 3s)",
@@ -790,6 +805,23 @@ void VioManager::do_feature_propagate_update(double timestamp) {
 
 }
 
+void VioManager::check_system_divergence(){
+    // Auto-reset the system if the divergence is detected a certain number of times.
+    if (velocity > params.reset_velocity_threshold){
+        ++consecutive_divergence_count;
+        ROS_WARN("Detect pose divergence %d times. The velocity is over the threshold: %f/%f", consecutive_divergence_count, velocity, params.reset_velocity_threshold);
+        if (consecutive_divergence_count == params.max_consecutive_divergence_count){
+            std_srvs::Empty empty;
+            if (reset_service_client_.call(empty)){
+                consecutive_divergence_count = 0;
+            }
+        }
+    }
+    else{
+        consecutive_divergence_count = 0;
+    }
+
+}
 
 void VioManager::update_keyframe_historical_information(const std::vector<Feature*> &features) {
 

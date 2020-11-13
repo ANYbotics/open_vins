@@ -24,6 +24,7 @@
 
 #include <string>
 #include <algorithm>
+#include <atomic>
 #include <fstream>
 #include <Eigen/StdVector>
 #include <boost/filesystem.hpp>
@@ -36,6 +37,8 @@
 #include <ov_core/init/InertialInitializer.h>
 #include <ov_core/types/LandmarkRepresentation.h>
 #include <ov_core/types/Landmark.h>
+
+#include <ros/service_client.h>
 
 #include "state/Propagator.h"
 #include "state/State.h"
@@ -65,10 +68,17 @@ namespace ov_msckf {
 
 
         /**
-         * @brief Default constructor, will load all configuration variables
+         * @brief Class constructor, will load all configuration variables
          * @param params_ Parameters loaded from either ROS or CMDLINE
          */
         VioManager(VioManagerOptions& params_);
+
+        /**
+         * @brief Class constructor, will load all configuration variables and set up a ros::ServiceClient.
+         * @param params_ Parameters loaded from either ROS or CMDLINE.
+         * @param reset_client The ros service client used to call the reset service server.
+         */
+        VioManager(VioManagerOptions& params_, ros::ServiceClient reset_client);
 
 
         /**
@@ -159,6 +169,30 @@ namespace ov_msckf {
         /// If we are initialized or not
         bool initialized() {
             return is_initialized_vio;
+        }
+
+        /**
+         * @brief Set the system initialization state.
+         * @param value The value used to set the system initialization state.
+         */
+        void set_initialization_flag(bool value){
+            if (is_initialized_vio != value) {
+                is_initialized_vio = value;
+            }
+        }
+
+        /**
+         * @brief Reset the VIO system. It does the following:
+         * 1. Set the system initialization state to false and so that the system will restart initialization.
+         * 2. Clear the whole saved feature database.
+         * 3. Set the flag to notify the Visualizer to clear the VIO path poses.
+         */
+        void reset(){
+            // Thread-safe.
+            set_initialization_flag(false);
+            trackFEATS->reset();
+            // Thread-safe.
+            set_clear_vio_path_in_visualization(true);
         }
 
         /// Timestamp that the system was initialized at
@@ -271,9 +305,30 @@ namespace ov_msckf {
             feat_timestamps = hist_feat_timestamps;
         }
 
+        /**
+         * @brief Get the boolean of whether to reset the VIO path in the visualization.
+         * @return The value of clear_vio_path.
+         */
+        bool clear_vio_path_in_visualization(){
+            return clear_vio_path;
+        }
+
+        /**
+         * @brief Set the value of clear_vio_path.
+         * @param value Set clear_vio_path to value.
+         */
+        void set_clear_vio_path_in_visualization(bool value){
+            if (clear_vio_path != value){
+                clear_vio_path = value;
+            }
+        }
+
 
     protected:
-
+        /**
+         * @brief Check whether we need to reset the system.
+         */
+        void check_system_divergence();
 
         /**
          * @brief This function will try to initialize the state.
@@ -321,8 +376,11 @@ namespace ov_msckf {
         /// State initializer
         InertialInitializer* initializer;
 
+        /// Whether to reset the VIO path for visualization.
+        std::atomic<bool> clear_vio_path{false};
+
         /// Boolean if we are initialized or not
-        bool is_initialized_vio = false;
+        std::atomic<bool> is_initialized_vio{false};
 
         /// Our MSCKF feature updater
         UpdaterMSCKF* updaterMSCKF;
@@ -343,6 +401,10 @@ namespace ov_msckf {
         // Track how much distance we have traveled
         double timelastupdate = -1;
         double distance = 0;
+        /// The inter-frame velocity . (meters/second).
+        double velocity = 0;
+        /// The consecutive count of the system divergence.
+        int consecutive_divergence_count = 0;
 
         // Startup time of the filter
         double startup_time = -1;
@@ -358,6 +420,9 @@ namespace ov_msckf {
         std::unordered_map<size_t, std::unordered_map<size_t, std::vector<Eigen::VectorXf>>> hist_feat_uvs;
         std::unordered_map<size_t, std::unordered_map<size_t, std::vector<Eigen::VectorXf>>> hist_feat_uvs_norm;
         std::unordered_map<size_t, std::unordered_map<size_t, std::vector<double>>> hist_feat_timestamps;
+        /// The ros service reset client.
+        // todo (GZ): ideally VIO manager should be ros independent.
+        ros::ServiceClient reset_service_client_;
 
 
     };

@@ -31,14 +31,7 @@ int main(int argc, char** argv) {
     ros::NodeHandle nh("~");
     ros::NodeHandle image_nh;
     ros::CallbackQueue image_callback_queue;
-    ov_msckf::VisualInertialOdometryRos ros_setup_obj(nh, image_nh, image_callback_queue);
-
-    std::thread callback_witch_thread;
-    if (ros_setup_obj.camera_id_to_use_vec_.size() == 2)
-    {
-        ROS_INFO_STREAM("Starting a callback_switch_thread for handling sensor failure.");
-        callback_witch_thread = std::thread(&ov_msckf::VisualInertialOdometryRos::callback_switch, &ros_setup_obj);
-    }
+    ov_msckf::VisualInertialOdometryRos vio_ros_obj(nh, image_nh, image_callback_queue);
 
     ros::AsyncSpinner spinner(nh.param<int>("thread_count/global_thread_num", 2));
     spinner.start();
@@ -46,10 +39,17 @@ int main(int argc, char** argv) {
     ros::AsyncSpinner image_spinner(nh.param<int>("thread_count/image_specific_thread_num", 2), &image_callback_queue);
     image_spinner.start();
 
+    std::thread callback_switch_thread;
+    if (vio_ros_obj.enable_sensor_failure_handler_thread())
+    {
+        ROS_INFO_STREAM("Starting a callback_switch_thread for handling sensor failure.");
+        callback_switch_thread = std::thread(&ov_msckf::VisualInertialOdometryRos::callback_switch, &vio_ros_obj);
+    }
+
     ros::waitForShutdown();
 
     // Final visualization
-    ros_setup_obj.viz_->visualize_final();
+    vio_ros_obj.viz_->visualize_final();
     // Done!
     return EXIT_SUCCESS;
 }

@@ -142,6 +142,9 @@ namespace ov_msckf {
         assert(gravity.size()==3);
         params.gravity << gravity.at(0),gravity.at(1),gravity.at(2);
 
+        // State Reset Parameters ========================================================
+        nh.param<int>("reset/max_consecutive_divergence_count", params.max_consecutive_divergence_count, params.max_consecutive_divergence_count);
+        nh.param<double>("reset/reset_velocity_threshold", params.reset_velocity_threshold, params.reset_velocity_threshold);
 
         // TRACKERS ======================================================================
 

@@ -6,8 +6,10 @@
  */
 
 #include "VisualInertialOdometryRos.h"
+#include "ros_transport.h"
 
 #include <memory>
+#include <std_msgs/Empty.h>
 
 namespace ov_msckf {
 
@@ -16,13 +18,17 @@ VisualInertialOdometryRos::VisualInertialOdometryRos(ros::NodeHandle& nh, ros::N
     imageNh_.setCallbackQueue(&imageCallbackQueue);
     // Read parameters from ROS parameter server.
     params_ = parse_ros_nodehandler(nh_);
-    bool success = read_ros_setup_parameters();
+    const bool success = read_vio_setup_parameters();
     if (!success){
         ROS_WARN("Cannot fetch ROS setup parameters. Will use the default values.");
     }
 
-    sys_ = std::make_shared<VioManager>(params_);
-    viz_ = std::make_unique<RosVisualizer>(nh_, sys_);
+    ov_msckf::advertiseService(nh_, reset_server_, "reset", &VisualInertialOdometryRos::reset_callback, this);
+
+    ros::ServiceClient reset_client = nh_.serviceClient<std_srvs::Empty>(reset_server_.getService());
+    vio_manager_ = std::make_shared<VioManager>(params_, reset_client);
+
+    viz_ = std::make_shared<RosVisualizer>(nh_, vio_manager_);
 
     if (params_.use_contact_for_initialization) {
         setup_contact_subscribers();
@@ -34,13 +40,42 @@ VisualInertialOdometryRos::VisualInertialOdometryRos(ros::NodeHandle& nh, ros::N
 
     setup_image_subscribers();
 
+    // Set up reset notification publisher.
+    ov_msckf::advertise<std_msgs::Empty>(nh_, reset_notification_publisher_, "reset_notification");
+
     ROS_INFO("Finished setting up subscribers for the system.");
 }
 
-bool VisualInertialOdometryRos::read_ros_setup_parameters(){
+void VisualInertialOdometryRos::publish_reset_notification() const{
+    if (reset_notification_publisher_.getNumSubscribers() > 0u || reset_notification_publisher_.isLatched()) {
+        auto msg = boost::make_shared<std_msgs::Empty>();
+        reset_notification_publisher_.publish(msg);
+    }
+}
+
+bool VisualInertialOdometryRos::enable_sensor_failure_handler_thread(){
+    return (camera_id_to_use_vec_.size() == 2 && handle_sensor_failure_);
+}
+
+bool VisualInertialOdometryRos::reset_callback(std_srvs::Empty::Request & /*request*/, std_srvs::Empty::Response & /*response*/) {
+    if (vio_manager_->initialized()) {
+        // todo (GZ): Check whether we need to clean system state.
+        vio_manager_->reset();
+        publish_reset_notification();
+        ROS_INFO("System is reset.");
+    }
+    else
+    {
+        ROS_INFO("System is not initialized yet.");
+    }
+    return true;
+}
+
+bool VisualInertialOdometryRos::read_vio_setup_parameters(){
     bool success = nh_.getParam("callback_switch_parameters/message_wait_time_out", message_wait_time_out_);
     success &= nh_.getParam("callback_switch_parameters/checking_frequency", checking_frequency_);
     success &= nh_.getParam("image_sync_time_diff_tolerance", image_sync_time_diff_tolerance_);
+    success &= nh_.getParam("handle_sensor_failure", handle_sensor_failure_);
     return success;
 }
 
@@ -106,6 +141,7 @@ void VisualInertialOdometryRos::setup_contact_subscribers(){
 
 void VisualInertialOdometryRos::callback_switch(){
     while(ros::ok()) {
+        // todo (GZ): is this a good way to monitor the sensor data?
         auto image_0_msg = ros::topic::waitForMessage<sensor_msgs::Image>(param_io::param<std::string>(nh_, "subscribers/" + camera_input_0_ + "/topic", camera_input_0_),
             imageNh_, ros::Duration(message_wait_time_out_));
         auto image_1_msg = ros::topic::waitForMessage<sensor_msgs::Image>(param_io::param<std::string>(nh_, "subscribers/" + camera_input_1_ + "/topic", camera_input_1_),
@@ -184,7 +220,7 @@ void VisualInertialOdometryRos::callback_feet_contact(const signal_logger_msgs::
     const auto is_in_contact_foot3 = msg3->value;
 
     const bool is_in_contact = (is_in_contact_foot0 != 0u) && (is_in_contact_foot1 != 0u) && (is_in_contact_foot2 != 0u) && (is_in_contact_foot3 != 0u);
-    sys_->feed_measurement_contact(time, is_in_contact);
+    vio_manager_->feed_measurement_contact(time, is_in_contact);
 }
 
 void VisualInertialOdometryRos::callback_inertial(const sensor_msgs::Imu::ConstPtr& msg) {
@@ -195,7 +231,7 @@ void VisualInertialOdometryRos::callback_inertial(const sensor_msgs::Imu::ConstP
     am << msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z;
 
     // Send the IMU measurement to the VIO system.
-    sys_->feed_measurement_imu(imu_msg_time, wm, am);
+    vio_manager_->feed_measurement_imu(imu_msg_time, wm, am);
     viz_->visualize_odometry(imu_msg_time);
 }
 
@@ -210,20 +246,12 @@ void VisualInertialOdometryRos::callback_monocular(const sensor_msgs::ImageConst
         return;
     }
 
-    if (img_mat_buffer_map_[camera_id].rows == 0) {
-        image_timestamp_buffer_map_[camera_id] = cv_ptr->header.stamp.toSec();
-        img_mat_buffer_map_[camera_id] = cv_ptr->image.clone();
-        return;
-    }
-
-    // Send it to our VIO system.
-    sys_->feed_measurement_monocular(image_timestamp_buffer_map_[camera_id] , img_mat_buffer_map_[camera_id], camera_id);
-    viz_->visualize();
-
-    // Move buffer forward.
     image_timestamp_buffer_map_[camera_id]  = cv_ptr->header.stamp.toSec();
     img_mat_buffer_map_[camera_id] = cv_ptr->image.clone();
 
+    // Send it to our VIO system.
+    vio_manager_->feed_measurement_monocular(image_timestamp_buffer_map_[camera_id] , img_mat_buffer_map_[camera_id], camera_id);
+    viz_->visualize();
 }
 
 void VisualInertialOdometryRos::callback_stereo(const sensor_msgs::ImageConstPtr& msg0, const sensor_msgs::ImageConstPtr& msg1) {
@@ -247,25 +275,15 @@ void VisualInertialOdometryRos::callback_stereo(const sensor_msgs::ImageConstPtr
         return;
     }
 
-    // todo (GZ): make the logic below better. iterate the camera ids in this camera_id_to_use_vec_ instead of using 0 and 1
-    // Fill our buffer if we have not.
-    if(img_mat_buffer_map_[0].rows == 0 || img_mat_buffer_map_[1].rows == 0) {
-        image_timestamp_buffer_map_[0] = cv_ptr0->header.stamp.toSec();
-        img_mat_buffer_map_[0] = cv_ptr0->image.clone();
-        image_timestamp_buffer_map_[1] = cv_ptr1->header.stamp.toSec();
-        img_mat_buffer_map_[1] = cv_ptr1->image.clone();
-        return;
-    }
-
-    // Send it to our VIO system.
-    sys_->feed_measurement_stereo(image_timestamp_buffer_map_, img_mat_buffer_map_, 0, 1, image_sync_time_diff_tolerance_);
-    viz_->visualize();
-
-    // Move buffer forward.
+    // todo (GZ): make the logic below better.
     image_timestamp_buffer_map_[0] = cv_ptr0->header.stamp.toSec();
     img_mat_buffer_map_[0] = cv_ptr0->image.clone();
     image_timestamp_buffer_map_[1] = cv_ptr1->header.stamp.toSec();
     img_mat_buffer_map_[1] = cv_ptr1->image.clone();
+
+    // Send it to our VIO system.
+    vio_manager_->feed_measurement_stereo(image_timestamp_buffer_map_, img_mat_buffer_map_, 0, 1, image_sync_time_diff_tolerance_);
+    viz_->visualize();
 
     // Get timing statistics information.
     auto rT2 =  boost::posix_time::microsec_clock::local_time();

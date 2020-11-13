@@ -21,6 +21,7 @@
 #include <message_filters/time_synchronizer.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/Imu.h>
+#include <std_srvs/Empty.h>
 
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core/mat.hpp>
@@ -40,11 +41,28 @@ class VisualInertialOdometryRos{
 public:
     explicit VisualInertialOdometryRos(ros::NodeHandle& nh, ros::NodeHandle& imageNh, ros::CallbackQueue& imageCallbackQueue);
     // todo (GZ): extend this function to support multiple cameras (2+)?
+    /**
+     * @brief Check whether the sensor is streaming images and set up the corresponding callbacks for processing.
+     */
     void callback_switch();
+    /**
+     * @brief The reset service callback.
+     * @param request The service message from the client.
+     * @param response The service message return from the serve.
+     * @return True if the service call is successful.
+     */
+    bool reset_callback(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
+    /**
+     * @brief Whether or not to start the thread to handle sensor failure.
+     * @return True if a thread is required to spawn, false otherwise.
+     */
+    bool enable_sensor_failure_handler_thread();
+    /**
+     * @brief Publish the notification when the system is reset.
+     */
+    void publish_reset_notification() const;
     VioManagerOptions params_;
-    std::unique_ptr<RosVisualizer> viz_;
-    // The vector of the camera ids that will be used for VIO.
-    std::vector<int> camera_id_to_use_vec_;
+    std::shared_ptr<RosVisualizer> viz_;
 
 private:
     /**
@@ -96,7 +114,7 @@ private:
      */
     void setup_mono_camera_callback_functions();
 
-    bool read_ros_setup_parameters();
+    bool read_vio_setup_parameters();
 
     // Define message_filters synchronization policies for image topics.
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> image_pair_sync_pol;
@@ -104,7 +122,7 @@ private:
     typedef message_filters::sync_policies::ExactTime<signal_logger_msgs::UInt32Stamped, signal_logger_msgs::UInt32Stamped,
     signal_logger_msgs::UInt32Stamped, signal_logger_msgs::UInt32Stamped> feet_contact_sync_pol;
 
-    std::shared_ptr<VioManager> sys_;
+    std::shared_ptr<VioManager> vio_manager_;
 
     // Buffer data.
     std::map<unsigned int, double> image_timestamp_buffer_map_;
@@ -131,6 +149,11 @@ private:
 
     std::map<unsigned int, boost::function<void(const boost::shared_ptr<sensor_msgs::Image const>&)>> mono_camera_callback_map_;
 
+    // Reset server.
+    ros::ServiceServer reset_server_;
+    // Reset Notification Publisher.
+    ros::Publisher reset_notification_publisher_;
+
     std::unique_ptr<message_filters::Synchronizer<image_pair_sync_pol>> image_pair_sync_ptr_;
     std::unique_ptr<message_filters::Synchronizer<feet_contact_sync_pol>> feet_contact_sync_ptr_;
 
@@ -143,5 +166,9 @@ private:
     double checking_frequency_ = 1.0;
     // The maximum allowed timestamp difference among a synced image-pair. Unit: second.
     double image_sync_time_diff_tolerance_ = 0.004;
+    // The vector of the camera ids that will be used for VIO.
+    std::vector<int> camera_id_to_use_vec_;
+    // Whether or not to handle sensor failure.
+    bool handle_sensor_failure_ = false;
 };
 }  // namespace ov_msckf

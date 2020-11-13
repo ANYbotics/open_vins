@@ -118,6 +118,10 @@ void RosVisualizer::visualize() {
 
     // publish current image
     publish_images();
+    // If the system is reset, the VIO path should be reset here.
+    if (_app->clear_vio_path_in_visualization()){
+        reset_imu_poses();
+    }
 
     // Return if we have not inited
     if(!_app->initialized())
@@ -274,7 +278,12 @@ void RosVisualizer::visualize_final() {
 
 }
 
-
+void RosVisualizer::reset_imu_poses(){
+     poses_imu.clear();
+     // After the VIO path poses are reset, set the boolean to false to avoid duplicated reset.
+     _app->set_clear_vio_path_in_visualization(false);
+     return;
+}
 
 void RosVisualizer::publish_state() {
 
@@ -284,7 +293,8 @@ void RosVisualizer::publish_state() {
     // We want to publish in the IMU clock frame
     // The timestamp in the state will be the last camera time
     double t_ItoC = state->_calib_dt_CAMtoIMU->value()(0);
-    double timestamp_inI = state->_timestamp + t_ItoC;
+    // todo (GZ): is t_ItoC necessary to add?
+    const double timestamp_inI = state->_timestamp + t_ItoC;
 
     // Create pose of IMU (note we use the bag time)
     geometry_msgs::PoseWithCovarianceStamped poseIinM;
@@ -388,7 +398,7 @@ void RosVisualizer::publish_images() {
 
     // Get our image of history tracks
     cv::Mat img_history;
-    if(_app->did_zero_velocity_update()) {
+    if(_app->initialized() && _app->did_zero_velocity_update()) {
         img_history = _app->get_zero_velocity_update_image();
     } else {
         trackFEATS->display_history(img_history,255,255,0,255,255,255);

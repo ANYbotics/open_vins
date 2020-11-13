@@ -56,8 +56,7 @@ bool UpdaterZeroVelocity::try_update(State *state, double timestamp) {
         imu_recent = Propagator::select_imu_readings(imu_data, timestamp - _imu_zero_velocity_window_length, timestamp);
     }
     catch (...) {
-        // todo (GZ): This exception is weird. Figure it out:)
-        ROS_INFO_STREAM("Cannot select imu readings");
+        ROS_WARN_STREAM("Cannot fetch required IMU measurements from stored IMU data.");
         return false;
     }
 

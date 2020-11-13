@@ -89,6 +89,10 @@ namespace ov_msckf {
          * @brief After the run has ended, print results
          */
         void visualize_final();
+        /**
+         * @brief Reset the saved IMU poses.
+         */
+        void reset_imu_poses();
 
 
     protected:

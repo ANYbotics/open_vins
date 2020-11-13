@@ -291,6 +291,14 @@ namespace ov_core {
             return undistort_point_brown(pt_in, camK, camD);
         }
 
+        /**
+         * @brief This resets the current feature database.
+         */
+        void reset(){
+            // thread-safe.
+            database->clear();
+        }
+
     protected:
 
         /**

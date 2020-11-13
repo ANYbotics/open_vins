@@ -22,6 +22,7 @@ set(CATKIN_PACKAGE_HEADER_DEPENDENCIES
   sensor_msgs
   signal_logger_msgs
   std_msgs
+  std_srvs
   tf
   visualization_msgs
 )

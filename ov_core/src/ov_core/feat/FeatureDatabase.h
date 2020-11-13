@@ -318,6 +318,18 @@ namespace ov_core {
             return features_idlookup;
         }
 
+        /**
+         * @brief Clean up the feature database and free the memory.
+         * @remark This method is thread-safe.
+         */
+        void clear(){
+            std::unique_lock<std::mutex> lck(mtx);
+            for (auto it = features_idlookup.begin(); it != features_idlookup.end(); it++) {
+                delete (*it).second;
+            }
+            features_idlookup.clear();
+        }
+
     protected:
 
         /// Mutex lock for our map

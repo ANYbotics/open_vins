@@ -187,6 +187,12 @@ namespace ov_msckf {
             }
         }
 
+        // State Reset Parameters
+        /// Reset the system after detecting `max_consecutive_divergence_count` number of divergence consecutively.
+        int max_consecutive_divergence_count = 3;
+        /// The velocity threshold used to detect convergence.
+        double reset_velocity_threshold = 2.0;
+
         // TRACKERS ===============================
 
         /// If we should process two cameras are being stereo or binocular. If binocular, we do monocular feature tracking on each image.
