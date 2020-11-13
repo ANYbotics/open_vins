@@ -207,6 +207,38 @@ void VisualInertialOdometryRos::callback_switch(){
         }else{
             ROS_WARN_STREAM_THROTTLE(3, "No image for visual-inertial odometry is currently available (throttled: 3s)");
         }
+
+        // Disable or enable contact topics subscription when the system is initialized or uninitialized.
+        // todo (GZ): this could be moved to a service callback call instead of staying in this thread.
+        if (params_.use_contact_for_initialization){
+            if(vio_manager_->initialized()){
+                if (foot_lf_sub_.getSubscriber()!= nullptr){
+                    foot_lf_sub_.unsubscribe();
+                }
+                if(foot_lh_sub_.getSubscriber() != nullptr){
+                    foot_lh_sub_.unsubscribe();
+                }
+                if(foot_rf_sub_.getSubscriber() != nullptr){
+                    foot_rf_sub_.unsubscribe();
+                }
+                if(foot_rh_sub_.getSubscriber() != nullptr){
+                    foot_rh_sub_.unsubscribe();
+                }
+            }else{
+                if (foot_lf_sub_.getSubscriber() == nullptr){
+                    foot_lf_sub_.subscribe();
+                }
+                if(foot_lh_sub_.getSubscriber() == nullptr){
+                    foot_lh_sub_.subscribe();
+                }
+                if(foot_rf_sub_.getSubscriber() == nullptr){
+                    foot_rf_sub_.subscribe();
+                }
+                if(foot_rh_sub_.getSubscriber() == nullptr){
+                    foot_rh_sub_.subscribe();
+                }
+            }
+        }
         ros::Duration(1/checking_frequency_).sleep();
     }
 }
