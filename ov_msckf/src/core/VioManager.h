@@ -38,6 +38,9 @@
 #include <ov_core/types/LandmarkRepresentation.h>
 #include <ov_core/types/Landmark.h>
 
+#include <tbb/task_group.h>
+#include <tbb/task_scheduler_init.h>
+
 #include <ros/service_client.h>
 
 #include "state/Propagator.h"
@@ -424,6 +427,8 @@ namespace ov_msckf {
         // todo (GZ): ideally VIO manager should be ros independent.
         ros::ServiceClient reset_service_client_;
 
+        tbb::task_group tbb_task_group_;
+        //tbb::task_scheduler_init task_scheduler_init_(tbb::task_scheduler_init::deferred);
 
     };
 

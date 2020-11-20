@@ -139,6 +139,7 @@ VioManager::VioManager(VioManagerOptions& params_) {
 
 VioManager::VioManager(VioManagerOptions& params_, ros::ServiceClient reset_client): VioManager(params_){
     reset_service_client_ = std::move(reset_client);
+    //task_scheduler_init_.initialize(2);
 }
 
 void VioManager::feed_measurement_contact(double timestamp, bool is_in_contact) {
@@ -333,10 +334,11 @@ void VioManager::feed_measurement_stereo(std::map<unsigned int, double> &image_t
     if(params.use_stereo) {
         trackFEATS->feed_stereo(image_timestamp_buffer_map[cam_id0], img0, img1, cam_id0, cam_id1);
     } else {
-        boost::thread t_l = boost::thread(&TrackBase::feed_monocular, trackFEATS, boost::ref(image_timestamp_buffer_map[cam_id0]), boost::ref(img0), boost::ref(cam_id0));
-        boost::thread t_r = boost::thread(&TrackBase::feed_monocular, trackFEATS, boost::ref(image_timestamp_buffer_map[cam_id0]), boost::ref(img1), boost::ref(cam_id1));
-        t_l.join();
-        t_r.join();
+        // todo (GZ) can we make it as a member variable. Tried. Resolve TBB warnings
+        tbb::task_scheduler_init init(2);
+        tbb_task_group_.run(boost::bind(&TrackBase::feed_monocular, trackFEATS, boost::ref(image_timestamp_buffer_map[cam_id0]), boost::ref(img0), boost::ref(cam_id0)));
+        tbb_task_group_.run(boost::bind(&TrackBase::feed_monocular, trackFEATS, boost::ref(image_timestamp_buffer_map[cam_id0]), boost::ref(img1), boost::ref(cam_id1)));
+        tbb_task_group_.wait();
     }
 
     // If aruoc is avalible, the also pass to it

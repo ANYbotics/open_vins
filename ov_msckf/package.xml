@@ -51,6 +51,7 @@
     <depend>libopencv-dev</depend>
     <depend>param_io</depend>
     <depend>std_srvs</depend>
+    <depend>tbb</depend>
 
 <!--     <test_depend>cmake_code_coverage</test_depend> -->
     <test_depend>gtest</test_depend>

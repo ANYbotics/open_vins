@@ -42,11 +42,25 @@ find_package(Eigen3 REQUIRED)
 find_package(OpenCV 4 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system filesystem thread date_time)
 
+## System dependencies are found with CMake's conventions
+find_package(PkgConfig REQUIRED)
+
+pkg_check_modules(TBB "tbb")
+if (TBB_FOUND)
+  add_definitions(
+    ${TBB_CFLAGS}
+    ${TBB_CFLAGS_OTHER}
+  )
+else()
+  message([FATAL_ERROR] "tbb module not found")
+endif ()
+
 ## The catkin_package macro generates cmake config files for your package.
 catkin_package(
   INCLUDE_DIRS
     src
     ${EIGEN3_INCLUDE_DIR}
+    ${TBB_INCLUDE_DIRS}
   LIBRARIES
     ${PROJECT_NAME}
   CATKIN_DEPENDS
@@ -85,12 +99,14 @@ target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
   ${Boost_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${OPENCV_INCLUDE_DIRS}
+  ${TBB_INCLUDE_DIRS}
 )
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   ${Boost_LIBRARIES}
   ${OpenCV_LIBRARIES}
+  ${TBB_LIBRARIES}
 )
 
 # Add executable

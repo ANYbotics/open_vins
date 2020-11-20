@@ -21,9 +21,12 @@
 
 #include "utils/VisualInertialOdometryRos.h"
 
+#include <opencv2/core.hpp>
+
 #include <ros/callback_queue.h>
 #include <ros/ros.h>
 #include <ros/spinner.h>
+
 
 int main(int argc, char** argv) {
     // Launch our ros node
@@ -31,12 +34,14 @@ int main(int argc, char** argv) {
     ros::NodeHandle nh("~");
     ros::NodeHandle image_nh;
     ros::CallbackQueue image_callback_queue;
+    // Otherwise OpenCV will use  a lot of threads. https://medium.com/@rachittayal7/a-note-on-opencv-threads-performance-in-prod-d10180716fba.
+    cv::setNumThreads(nh.param<int>("thread_count/opencv_thread_num", 2));
     ov_msckf::VisualInertialOdometryRos vio_ros_obj(nh, image_nh, image_callback_queue);
 
-    ros::AsyncSpinner spinner(nh.param<int>("thread_count/global_thread_num", 2));
+    ros::AsyncSpinner spinner(nh.param<int>("thread_count/global_thread_num", 1));
     spinner.start();
 
-    ros::AsyncSpinner image_spinner(nh.param<int>("thread_count/image_specific_thread_num", 2), &image_callback_queue);
+    ros::AsyncSpinner image_spinner(nh.param<int>("thread_count/image_specific_thread_num", 1), &image_callback_queue);
     image_spinner.start();
 
     std::thread callback_switch_thread;
@@ -48,9 +53,6 @@ int main(int argc, char** argv) {
 
     ros::waitForShutdown();
 
-    // Final visualization
-    vio_ros_obj.viz_->visualize_final();
-    // Done!
     return EXIT_SUCCESS;
 }
 
