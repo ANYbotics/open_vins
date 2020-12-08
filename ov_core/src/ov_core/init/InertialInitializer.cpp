@@ -84,7 +84,7 @@ bool InertialInitializer::obtain_initialization_window(double & window_start, do
         while (contact_data[contact_data_latest_index].timestamp >= initialization_start_timestamp) {
             is_in_consecutive_contact &= contact_data[contact_data_latest_index--].is_in_contact;
             if (!is_in_consecutive_contact) {
-                ROS_WARN_THROTTLE(1, "The agent is not in contact in the initialization window. (Warning is throttled: 1s)");
+                ROS_WARN_THROTTLE(10, "The agent is not in contact in the initialization window. (Warning is throttled: 10s)");
                 return false;
             }
         }

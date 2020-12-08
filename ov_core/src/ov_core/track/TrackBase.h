@@ -236,6 +236,15 @@ namespace ov_core {
         virtual void display_history(cv::Mat &img_out, int r1, int g1, int b1, int r2, int g2, int b2);
 
         /**
+         * @brief Shows a "trail" for each feature (i.e. its history). If the system is not initialized, it also shows the state on the image.
+         * @param img_out image to which we will overlayed features on
+         * @param r1,g1,b1 first color to draw in
+         * @param r2,g2,b2 second color to draw in
+         * @param is_initialized Whether the system is initialized or not
+       */
+        virtual void display_history(cv::Mat &img_out, int r1, int g1, int b1, int r2, int g2, int b2, bool is_initialized);
+
+        /**
          * @brief Get the feature database with all the track information
          * @return FeatureDatabase pointer that one can query for features
          */

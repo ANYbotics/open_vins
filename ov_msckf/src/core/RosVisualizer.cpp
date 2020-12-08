@@ -293,12 +293,17 @@ void RosVisualizer::publish_state() {
     // We want to publish in the IMU clock frame
     // The timestamp in the state will be the last camera time
     double t_ItoC = state->_calib_dt_CAMtoIMU->value()(0);
-    // todo (GZ): is t_ItoC necessary to add?
     const double timestamp_inI = state->_timestamp + t_ItoC;
 
     // Create pose of IMU (note we use the bag time)
     geometry_msgs::PoseWithCovarianceStamped poseIinM;
-    poseIinM.header.stamp = ros::Time(timestamp_inI);
+    try {
+        poseIinM.header.stamp = ros::Time(timestamp_inI);
+    } catch (...) {
+        // todo (GZ): one exception happened here during the test.
+        ROS_ERROR("Cannot get the ROS time for the IMU pose");
+        return;
+    }
     poseIinM.header.seq = poses_seq_imu;
     poseIinM.header.frame_id = "vio_odom";
     poseIinM.pose.pose.orientation.x = state->_imu->quat()(0);
@@ -401,7 +406,7 @@ void RosVisualizer::publish_images() {
     if(_app->initialized() && _app->did_zero_velocity_update()) {
         img_history = _app->get_zero_velocity_update_image();
     } else {
-        trackFEATS->display_history(img_history,255,255,0,255,255,255);
+        trackFEATS->display_history(img_history,255,255,0,255,255,255, _app->initialized());
         if(trackARUCO != nullptr) {
             trackARUCO->display_history(img_history, 0, 255, 255, 255, 255, 255);
             trackARUCO->display_active(img_history, 0, 255, 255, 255, 255, 255);

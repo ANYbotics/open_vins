@@ -171,4 +171,93 @@ void TrackBase::display_history(cv::Mat &img_out, int r1, int g1, int b1, int r2
 
 }
 
+void TrackBase::display_history(cv::Mat &img_out, int r1, int g1, int b1, int r2, int g2, int b2, bool is_initialized){
+    // Cache the images to prevent other threads from editing while we viz (which can be slow)
+    std::map<size_t, cv::Mat> img_last_cache;
+    for(auto const& pair : img_last) {
+        img_last_cache.insert({pair.first,pair.second.clone()});
+    }
+
+    // Get the largest width and height
+    int max_width = -1;
+    int max_height = -1;
+    for(auto const& pair : img_last_cache) {
+        if(max_width < pair.second.cols) max_width = pair.second.cols;
+        if(max_height < pair.second.rows) max_height = pair.second.rows;
+    }
+
+    // Return if we didn't have a last image
+    if(max_width==-1 || max_height==-1)
+        return;
+
+    // If the image is "small" thus we should use smaller display codes
+    const bool is_small = (std::min(max_width,max_height) < 400);
+
+    // If the image is "new" then draw the images from scratch
+    // Otherwise, we grab the subset of the main image and draw on top of it
+    bool image_new = ((int)img_last_cache.size()*max_width != img_out.cols || max_height != img_out.rows);
+
+    // If new, then resize the current image
+    if(image_new) img_out = cv::Mat(max_height,(int)img_last_cache.size()*max_width,CV_8UC3,cv::Scalar(0,0,0));
+
+    // Max tracks to show (otherwise it clutters up the screen)
+    //size_t maxtracks = 10;
+    size_t maxtracks = static_cast<size_t>(-1);
+
+    // Loop through each image, and draw
+    int index_cam = 0;
+    for(auto const& pair : img_last_cache) {
+        // Lock this image
+        std::unique_lock<std::mutex> lck(mtx_feeds.at(pair.first));
+        // select the subset of the image
+        cv::Mat img_temp;
+        if(image_new) cv::cvtColor(img_last_cache[pair.first], img_temp, cv::COLOR_GRAY2RGB);
+        else img_temp = img_out(cv::Rect(max_width*index_cam,0,max_width,max_height));
+        // draw, loop through all keypoints
+        for(size_t i=0; i<ids_last[pair.first].size(); i++) {
+            // Get the feature from the database
+            Feature* feat = database->get_feature(ids_last[pair.first].at(i));
+            // Skip if the feature is null
+            if(feat == nullptr || feat->uvs[pair.first].empty())
+                continue;
+            // Draw the history of this point (start at the last inserted one)
+            for(size_t z=feat->uvs[pair.first].size()-1; z>0; z--) {
+                // Check if we have reached the max
+                if(feat->uvs[pair.first].size()-z > maxtracks)
+                    break;
+                // Calculate what color we are drawing in
+                bool is_stereo = (feat->uvs.size() > 1);
+                int color_r = (is_stereo? b2 : r2)-(int)((is_stereo? b1 : r1)/feat->uvs[pair.first].size()*z);
+                int color_g = (is_stereo? r2 : g2)-(int)((is_stereo? r1 : g1)/feat->uvs[pair.first].size()*z);
+                int color_b = (is_stereo? g2 : b2)-(int)((is_stereo? g1 : b1)/feat->uvs[pair.first].size()*z);
+                // Draw current point
+                cv::Point2f pt_c(feat->uvs[pair.first].at(z)(0),feat->uvs[pair.first].at(z)(1));
+                cv::circle(img_temp, pt_c, (is_small)? 1 : 2, cv::Scalar(color_r,color_g,color_b), cv::FILLED);
+                // If there is a next point, then display the line from this point to the next
+                if(z+1 < feat->uvs[pair.first].size()) {
+                    cv::Point2f pt_n(feat->uvs[pair.first].at(z+1)(0),feat->uvs[pair.first].at(z+1)(1));
+                    cv::line(img_temp, pt_c, pt_n, cv::Scalar(color_r,color_g,color_b));
+                }
+                // If the first point, display the ID
+                if(z==feat->uvs[pair.first].size()-1) {
+                    //cv::putText(img_out0, std::to_string(feat->featid), pt_c, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
+                    //cv::circle(img_out0, pt_c, 2, cv::Scalar(color,color,255), cv::FILLED);
+                }
+            }
+        }
+        // Draw what camera this is
+        auto txtpt = (is_small)? cv::Point(10,30) : cv::Point(30,60);
+        if (is_initialized){
+            cv::putText(img_temp, "CAM:"+std::to_string((int)pair.first), txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.5 : 3.0, cv::Scalar(0,255,0), 3);
+        }else{
+            cv::putText(img_temp, "UNINITIALIZED", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.5 : 3.0, cv::Scalar(0, 0, 255), 3);
+        }
+
+        // Replace the output image
+        img_temp.copyTo(img_out(cv::Rect(max_width*index_cam,0,img_last_cache[pair.first].cols,img_last_cache[pair.first].rows)));
+        index_cam++;
+    }
+
+}
+
 
