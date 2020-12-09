@@ -59,14 +59,15 @@ bool VisualInertialOdometryRos::enable_sensor_failure_handler_thread(){
 
 bool VisualInertialOdometryRos::reset_callback(std_srvs::Empty::Request & /*request*/, std_srvs::Empty::Response & /*response*/) {
     if (vio_manager_->initialized()) {
+        ROS_INFO("Resetting node.");
         // todo (GZ): Check whether we need to clean system state.
         vio_manager_->reset();
         publish_reset_notification();
-        ROS_INFO("System is reset.");
+        ROS_INFO("Node is reset.");
     }
     else
     {
-        ROS_INFO("System is not initialized yet.");
+        ROS_INFO("Node is not initialized yet.");
     }
     return true;
 }
