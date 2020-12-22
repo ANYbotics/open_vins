@@ -27,6 +27,7 @@ using namespace ov_core;
 
 void InertialInitializer::feed_imu(double timestamp, Eigen::Matrix<double,3,1> wm, Eigen::Matrix<double,3,1> am) {
 
+    ROS_DEBUG_THROTTLE(1, "The timestamp of the IMU measurement to add: %f (throttled: 1s)", timestamp);
     // Create our imu data object
     IMUDATA data;
     data.timestamp = timestamp;
@@ -50,6 +51,7 @@ void InertialInitializer::feed_imu(double timestamp, Eigen::Matrix<double,3,1> w
 
 void InertialInitializer::feed_contact(double timestamp, bool is_in_contact) {
 
+    ROS_DEBUG_THROTTLE(1, "The timestamp of the contact measurement to add: %f (throttled: 1s)", timestamp);
     FeetContact data;
     data.timestamp = timestamp;
     data.is_in_contact = is_in_contact;
@@ -127,6 +129,11 @@ bool InertialInitializer::fetch_imu_data_for_initialization(std::vector<IMUDATA>
         ROS_WARN_STREAM_THROTTLE(1,
                                  "The initialization window time at the end minus the timestamp of the latest selected IMU measurement is "
                                      << valid_window_end_time - valid_imu_measurements_window.begin()->timestamp
+                                     << " (Warning is throttled: 1s).");
+    } else{
+        ROS_WARN_STREAM_THROTTLE(1,
+                                 "The initialization window time at the end minus the timestamp of the latest IMU measurement is "
+                                     << valid_window_end_time - imu_data.back().timestamp
                                      << " (Warning is throttled: 1s).");
     }
     return false;

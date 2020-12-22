@@ -48,10 +48,13 @@
     <depend>eigen</depend>
     <depend>boost</depend>
     <depend>image_transport</depend>
+    <depend>kindr</depend>
+    <depend>kindr_ros</depend>
     <depend>libopencv-dev</depend>
     <depend>param_io</depend>
     <depend>std_srvs</depend>
     <depend>tbb</depend>
+    <depend>tf2_ros</depend>
 
 <!--     <test_depend>cmake_code_coverage</test_depend> -->
     <test_depend>gtest</test_depend>

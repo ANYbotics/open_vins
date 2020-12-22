@@ -22,6 +22,10 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/Imu.h>
 #include <std_srvs/Empty.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+
+#include <kindr/Core>
 
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core/mat.hpp>
@@ -113,6 +117,11 @@ private:
      * @brief Assign callback functions for mono cameras.
      */
     void setup_mono_camera_callback_functions();
+    /**
+     * @brief Get the rigid body transform from imu to robot base frame from TF tree.
+     * @return True if the transform can be retrieved, false otherwise.
+     */
+    bool get_kindr_rigid_body_transform_from_imu_to_robot_frame();
 
     bool read_vio_setup_parameters();
 
@@ -170,5 +179,18 @@ private:
     std::vector<int> camera_id_to_use_vec_;
     // Whether or not to handle sensor failure.
     bool handle_sensor_failure_ = false;
+    // Whether to transform the IMU measurements from its own frame to robot (base) frame.
+    bool transform_imu_into_robot_frame_ = false;
+
+    /// TF buffer.
+    tf2_ros::Buffer tf_buffer_;
+
+    tf2_ros::TransformListener tf_listener_;
+    /// The rigid body transformation from IMU to robot base frame.
+    kindr::HomogeneousTransformationPosition3RotationQuaternionD T_RI_;
+
+    string imu_frame_id_ = "imu_link";
+    string robot_frame_id_ = "base";
+    double tf_timeout_imu_robot_ = 1.0;
 };
 }  // namespace ov_msckf

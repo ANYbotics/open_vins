@@ -14,6 +14,7 @@ set(CATKIN_PACKAGE_HEADER_DEPENDENCIES
   cv_bridge
   geometry_msgs
   image_transport
+  kindr_ros
   nav_msgs
   ov_core
   param_io
@@ -24,6 +25,7 @@ set(CATKIN_PACKAGE_HEADER_DEPENDENCIES
   std_msgs
   std_srvs
   tf
+  tf2_ros
   visualization_msgs
 )
 
@@ -37,6 +39,14 @@ find_package(catkin REQUIRED
   COMPONENTS
     ${CATKIN_PACKAGE_DEPENDENCIES}
 )
+
+# Attempt to find catkinized kindr
+find_package(kindr QUIET)
+if(NOT kindr_FOUND)
+  # Attempt to find package-based kindr
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(kindr kindr REQUIRED)
+endif()
 
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV 4 REQUIRED)
@@ -67,6 +77,7 @@ catkin_package(
     ${CATKIN_PACKAGE_HEADER_DEPENDENCIES}
   DEPENDS
     Boost
+    kindr
     OpenCV
 )
 
@@ -82,6 +93,7 @@ add_library(${PROJECT_NAME}
   src/update/UpdaterMSCKF.cpp
   src/update/UpdaterSLAM.cpp
   src/update/UpdaterZeroVelocity.cpp
+  src/utils/helper_functions.cpp
   src/utils/VisualInertialOdometryRos.cpp
 )
 
@@ -98,6 +110,7 @@ target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
   ${catkin_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
+  ${kindr_INCLUDE_DIRS}
   ${OPENCV_INCLUDE_DIRS}
   ${TBB_INCLUDE_DIRS}
 )

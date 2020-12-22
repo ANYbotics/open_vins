@@ -38,6 +38,9 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <image_transport/image_transport.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_datatypes.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include <cv_bridge/cv_bridge.h>
 #include <boost/filesystem.hpp>
@@ -115,6 +118,18 @@ namespace ov_msckf {
         /// Save current estimate state and groundtruth including calibration
         void sim_save_total_state_to_file();
 
+        /**
+         * @brief Read frame related parameters from ROS parameter server.
+         * @return True if the parameters are read successfully. False otherwise.
+         */
+        bool read_frame_parameters();
+
+        /**
+         * @brief Get the VIO map pose in odom and publish it.
+         * @param vio_tracked_pose The VIO-tracked pose in VIO inertial frame (map).
+         */
+        void publish_map_pose_in_odom(const geometry_msgs::PoseWithCovarianceStamped & vio_tracked_pose);
+
         /// ROS node handle that we publish onto
         ros::NodeHandle _nh;
 
@@ -132,7 +147,14 @@ namespace ov_msckf {
         ros::Publisher pub_points_msckf, pub_points_slam, pub_points_aruco, pub_points_sim;
         image_transport::Publisher pub_tracks;
         ros::Publisher pub_keyframe_pose, pub_keyframe_point, pub_keyframe_extrinsic, pub_keyframe_intrinsics;
+        /// The publisher to publish the pose of the current inertial frame in odometry frame.
+        ros::Publisher pub_poseimu_in_odom;
         tf::TransformBroadcaster *mTfBr;
+
+        /// TF buffer.
+        tf2_ros::Buffer tf_buffer_;
+
+        tf2_ros::TransformListener tf_listener_;
 
         // For path viz
         unsigned int poses_seq_imu = 0;
@@ -163,9 +185,15 @@ namespace ov_msckf {
         bool save_total_state;
         std::ofstream of_state_est, of_state_std, of_state_gt;
 
+        /// Frame names
+        string map_frame_id_ = "vio_odom";
+        string imu_frame_id_ = "imu_link";
+        string odometry_frame_id_ = "odom";
+        string robot_frame_id_ = "base";
+        double tf_timeout_ = 1.0;
+        bool publish_map_pose_in_odom_ =  false;
+        bool transform_imu_into_robot_frame_ = false;
     };
-
-
 }
 
 

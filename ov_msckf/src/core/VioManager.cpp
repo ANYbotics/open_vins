@@ -192,7 +192,7 @@ void VioManager::feed_measurement_monocular(double timestamp, cv::Mat& img0, siz
             cv::cvtColor(img0, img_outtemp0, cv::COLOR_GRAY2RGB);
             bool is_small = (std::min(img0.cols,img0.rows) < 400);
             auto txtpt = (is_small)? cv::Point(10,30) : cv::Point(30,60);
-            cv::putText(img_outtemp0, "zvup active", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,0,255),3);
+            cv::putText(img_outtemp0, "zero velocity", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,255,0),3);
             zupt_image = img_outtemp0.clone();
             return;
         }
@@ -247,8 +247,8 @@ void VioManager::feed_measurement_stereo(double timestamp, cv::Mat& img0, cv::Ma
             cv::cvtColor(img1, img_outtemp1, cv::COLOR_GRAY2RGB);
             bool is_small = (std::min(img0.cols,img0.rows) < 400);
             auto txtpt = (is_small)? cv::Point(10,30) : cv::Point(30,60);
-            cv::putText(img_outtemp0, "zvup active", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,0,255),3);
-            cv::putText(img_outtemp1, "zvup active", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,0,255),3);
+            cv::putText(img_outtemp0, "zero velocity", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,255,0),3);
+            cv::putText(img_outtemp1, "zero velocity", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,255,0),3);
             cv::hconcat(img_outtemp0, img_outtemp1, zupt_image);
             return;
         }
@@ -296,14 +296,17 @@ void VioManager::feed_measurement_stereo(std::map<unsigned int, double> &image_t
     // Assert we have good ids
     assert(cam_id0!=cam_id1);
 
-    // Downsample if we are downsampling
     cv::Mat img0, img1;
+    // Downsample if we are downsampling
     if(params.downsample_cameras) {
         cv::Mat img0_temp, img1_temp;
         cv::pyrDown(image_mat_buffer_map[cam_id0],img0_temp,cv::Size(image_mat_buffer_map[cam_id0].cols/2.0,image_mat_buffer_map[cam_id0].rows/2.0));
         cv::pyrDown(image_mat_buffer_map[cam_id1],img1_temp,cv::Size(image_mat_buffer_map[cam_id1].cols/2.0,image_mat_buffer_map[cam_id1].rows/2.0));
         img0 = img0_temp.clone();
         img1 = img1_temp.clone();
+    } else {
+        img0 = image_mat_buffer_map[cam_id0].clone();
+        img1 = image_mat_buffer_map[cam_id1].clone();
     }
 
     // Check if we should do zero-velocity, if so update the state with it
@@ -316,8 +319,8 @@ void VioManager::feed_measurement_stereo(std::map<unsigned int, double> &image_t
             cv::cvtColor(img1, img_outtemp1, cv::COLOR_GRAY2RGB);
             const bool is_small = (std::min(img0.cols,img0.rows) < 400);
             const auto txtpt = (is_small)? cv::Point(10,30) : cv::Point(30,60);
-            cv::putText(img_outtemp0, "zvup active", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,0,255),3);
-            cv::putText(img_outtemp1, "zvup active", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,0,255),3);
+            cv::putText(img_outtemp0, "zero velocity", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,255,0),3);
+            cv::putText(img_outtemp1, "zero velocity", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,255,0),3);
             cv::hconcat(img_outtemp0, img_outtemp1, zupt_image);
             return;
         }
@@ -391,7 +394,7 @@ void VioManager::feed_measurement_simulation(double timestamp, const std::vector
                 cv::Mat img_outtemp0 = cv::Mat::zeros(cv::Size(max_width,max_height), CV_8UC3);
                 bool is_small = (std::min(img_outtemp0.cols,img_outtemp0.rows) < 400);
                 auto txtpt = (is_small)? cv::Point(10,30) : cv::Point(30,60);
-                cv::putText(img_outtemp0, "zvup active", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,0,255),3);
+                cv::putText(img_outtemp0, "zero velocity", txtpt, cv::FONT_HERSHEY_COMPLEX_SMALL, (is_small)? 1.0 : 2.0, cv::Scalar(0,255,0),3);
                 if(n == 0) {
                     zupt_image = img_outtemp0.clone();
                 } else {

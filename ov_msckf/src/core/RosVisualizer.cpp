@@ -23,22 +23,32 @@
 // utils ros_transport
 #include "../utils/ros_transport.h"
 
+#include "../utils/helper_functions.h"
+
 // param io
 #include <param_io/get_param.hpp>
+
+// kindr ros
+#include <kindr_ros/kindr_ros.hpp>
+#include <kindr/Core>
 
 
 using namespace ov_msckf;
 
 
 
-RosVisualizer::RosVisualizer(ros::NodeHandle &nh, std::shared_ptr<VioManager> app, Simulator *sim) : _nh(nh), _it(nh), _app(app), _sim(sim) {
+RosVisualizer::RosVisualizer(ros::NodeHandle &nh, std::shared_ptr<VioManager> app, Simulator *sim) : _nh(nh), _it(nh), _app(app), _sim(sim), tf_listener_(tf_buffer_) {
 
 
+    if (!read_frame_parameters()){
+        ROS_WARN("Cannot fetch frame parameters. Will use the default values.");
+    }
 
     // Setup our transform broadcaster
     mTfBr = new tf::TransformBroadcaster();
     // Setup pose and path publisher
     ov_msckf::advertise<geometry_msgs::PoseWithCovarianceStamped>(nh, pub_poseimu, "imu_ekf_pose");
+    ov_msckf::advertise<geometry_msgs::PoseStamped>(nh, pub_poseimu_in_odom, "map_pose");
     ov_msckf::advertise<nav_msgs::Odometry>(nh, pub_odomimu, "imu_integration_odometry");
     ov_msckf::advertise<nav_msgs::Path>(nh, pub_pathimu, "imu_path");
 
@@ -111,7 +121,16 @@ RosVisualizer::RosVisualizer(ros::NodeHandle &nh, std::shared_ptr<VioManager> ap
 
 }
 
-
+bool RosVisualizer::read_frame_parameters(){
+    bool success = _nh.getParam("coordinate_frames/map", map_frame_id_);
+    success &= _nh.getParam("coordinate_frames/odometry", odometry_frame_id_);
+    success &= _nh.getParam("coordinate_frames/imu", imu_frame_id_);
+    success &= _nh.getParam("coordinate_frames/robot", robot_frame_id_);
+    success &= _nh.getParam("tf_timeout_imu_odometry", tf_timeout_);
+    success &= _nh.getParam("publish_map_pose_in_odom", publish_map_pose_in_odom_);
+    success &= _nh.getParam("transform_imu_into_robot_frame", transform_imu_into_robot_frame_);
+    return success;
+}
 
 void RosVisualizer::visualize() {
 
@@ -171,7 +190,7 @@ void RosVisualizer::visualize_odometry(double timestamp) {
     // Our odometry message
     nav_msgs::Odometry odomIinM;
     odomIinM.header.stamp = ros::Time(timestamp);
-    odomIinM.header.frame_id = "vio_odom";
+    odomIinM.header.frame_id = map_frame_id_;
 
     // The POSE component (orientation and position)
     odomIinM.pose.pose.orientation.x = state_plus(0);
@@ -285,6 +304,42 @@ void RosVisualizer::reset_imu_poses(){
      return;
 }
 
+void RosVisualizer::publish_map_pose_in_odom(const geometry_msgs::PoseWithCovarianceStamped & vio_tracked_pose){
+    if (pub_poseimu_in_odom.getNumSubscribers() > 0u || pub_poseimu_in_odom.isLatched()){
+        // The pose of the VIO-tracked frame in the VIO inertial frame (map frame).
+        kindr::HomogeneousTransformationPosition3RotationQuaternionD T_MV;
+        kindr_ros::convertFromRosGeometryMsg(vio_tracked_pose.pose.pose, T_MV);
+        geometry_msgs::TransformStamped odometryToVioTrackedFrameTfMsg;
+        try{
+            odometryToVioTrackedFrameTfMsg =
+                tf_buffer_.lookupTransform(imu_frame_id_, odometry_frame_id_, vio_tracked_pose.header.stamp, ros::Duration(tf_timeout_));
+        }
+        catch (tf2::TransformException &ex) {
+            ROS_WARN_STREAM("Caught a tf exception while getting the TF transform from odom to VIO-tacked frame: '" << ex.what() << "'.");
+            ROS_WARN_STREAM("You might run VIO without the external TF tree available, consider setting this parameter 'publish_map_pose_in_odom' to false.");
+        }
+
+        tf::StampedTransform odometryToVioTrackedFrameTf;
+        tf::transformStampedMsgToTF(odometryToVioTrackedFrameTfMsg, odometryToVioTrackedFrameTf);
+        // The odom frame pose in the VIO-tracked frame frame.
+        kindr::HomogeneousTransformationPosition3RotationQuaternionD T_VO;
+        kindr_ros::convertFromRosTf(odometryToVioTrackedFrameTf, T_VO);
+        // Compute the odometry to map transformation.
+        kindr::HomogeneousTransformationPosition3RotationQuaternionD T_MO = T_MV * T_VO;
+        T_MO.getRotation().fix();
+
+        // Convert the transformation back to TF.
+        tf::Transform transformOdometryToMap;
+        kindr_ros::convertToRosTf(T_MO, transformOdometryToMap);
+        tf::StampedTransform mapToOdometryStampedTransform_ =
+            tf::StampedTransform(transformOdometryToMap.inverse(), vio_tracked_pose.header.stamp, odometry_frame_id_,
+                                 vio_tracked_pose.header.frame_id);
+        // Convert to ROS message.
+        const geometry_msgs::PoseStamped poseStamped = tfToPose(mapToOdometryStampedTransform_);
+        pub_poseimu_in_odom.publish(poseStamped);
+    }
+}
+
 void RosVisualizer::publish_state() {
 
     // Get the current state
@@ -301,11 +356,11 @@ void RosVisualizer::publish_state() {
         poseIinM.header.stamp = ros::Time(timestamp_inI);
     } catch (...) {
         // todo (GZ): one exception happened here during the test.
-        ROS_ERROR("Cannot get the ROS time for the IMU pose");
+        ROS_ERROR("Cannot get the ROS time for the IMU pose: %f", timestamp_inI);
         return;
     }
     poseIinM.header.seq = poses_seq_imu;
-    poseIinM.header.frame_id = "vio_odom";
+    poseIinM.header.frame_id = map_frame_id_;
     poseIinM.pose.pose.orientation.x = state->_imu->quat()(0);
     poseIinM.pose.pose.orientation.y = state->_imu->quat()(1);
     poseIinM.pose.pose.orientation.z = state->_imu->quat()(2);
@@ -326,6 +381,9 @@ void RosVisualizer::publish_state() {
     }
     pub_poseimu.publish(poseIinM);
 
+    if (publish_map_pose_in_odom_){
+        publish_map_pose_in_odom(poseIinM);
+    }
 
     //=========================================================
     //=========================================================
@@ -342,7 +400,7 @@ void RosVisualizer::publish_state() {
     nav_msgs::Path arrIMU;
     arrIMU.header.stamp = ros::Time::now();
     arrIMU.header.seq = poses_seq_imu;
-    arrIMU.header.frame_id = "vio_odom";
+    arrIMU.header.frame_id = map_frame_id_;
     for(size_t i=0; i<poses_imu.size(); i+=std::floor(poses_imu.size()/16384.0)+1) {
         arrIMU.poses.push_back(poses_imu.at(i));
     }
@@ -356,7 +414,7 @@ void RosVisualizer::publish_state() {
     // NOTE: a rotation from GtoI in JPL has the same xyzw as a ItoG Hamilton rotation
     tf::StampedTransform trans;
     trans.stamp_ = ros::Time::now();
-    trans.frame_id_ = "vio_odom";
+    trans.frame_id_ = map_frame_id_;
     trans.child_frame_id_ = "imu";
     tf::Quaternion quat(state->_imu->quat()(0),state->_imu->quat()(1),state->_imu->quat()(2),state->_imu->quat()(3));
     trans.setRotation(quat);
@@ -438,7 +496,7 @@ void RosVisualizer::publish_features() {
 
     // Declare message and sizes
     sensor_msgs::PointCloud2 cloud;
-    cloud.header.frame_id = "vio_odom";
+    cloud.header.frame_id = map_frame_id_;
     cloud.header.stamp = ros::Time::now();
     cloud.width  = 3*feats_msckf.size();
     cloud.height = 1;
@@ -473,7 +531,7 @@ void RosVisualizer::publish_features() {
 
     // Declare message and sizes
     sensor_msgs::PointCloud2 cloud_SLAM;
-    cloud_SLAM.header.frame_id = "vio_odom";
+    cloud_SLAM.header.frame_id = map_frame_id_;
     cloud_SLAM.header.stamp = ros::Time::now();
     cloud_SLAM.width  = 3*feats_slam.size();
     cloud_SLAM.height = 1;
@@ -508,7 +566,7 @@ void RosVisualizer::publish_features() {
 
     // Declare message and sizes
     sensor_msgs::PointCloud2 cloud_ARUCO;
-    cloud_ARUCO.header.frame_id = "vio_odom";
+    cloud_ARUCO.header.frame_id = map_frame_id_;
     cloud_ARUCO.header.stamp = ros::Time::now();
     cloud_ARUCO.width  = 3*feats_aruco.size();
     cloud_ARUCO.height = 1;
@@ -548,7 +606,7 @@ void RosVisualizer::publish_features() {
 
     // Declare message and sizes
     sensor_msgs::PointCloud2 cloud_SIM;
-    cloud_SIM.header.frame_id = "vio_odom";
+    cloud_SIM.header.frame_id = map_frame_id_;
     cloud_SIM.header.stamp = ros::Time::now();
     cloud_SIM.width  = 3*feats_sim.size();
     cloud_SIM.height = 1;
@@ -609,7 +667,7 @@ void RosVisualizer::publish_groundtruth() {
     geometry_msgs::PoseStamped poseIinM;
     poseIinM.header.stamp = ros::Time(timestamp_inI);
     poseIinM.header.seq = poses_seq_gt;
-    poseIinM.header.frame_id = "vio_odom";
+    poseIinM.header.frame_id = map_frame_id_;
     poseIinM.pose.orientation.x = state_gt(1,0);
     poseIinM.pose.orientation.y = state_gt(2,0);
     poseIinM.pose.orientation.z = state_gt(3,0);
@@ -628,7 +686,7 @@ void RosVisualizer::publish_groundtruth() {
     nav_msgs::Path arrIMU;
     arrIMU.header.stamp = ros::Time::now();
     arrIMU.header.seq = poses_seq_gt;
-    arrIMU.header.frame_id = "vio_odom";
+    arrIMU.header.frame_id = map_frame_id_;
     for(size_t i=0; i<poses_gt.size(); i+=std::floor(poses_gt.size()/16384.0)+1) {
         arrIMU.poses.push_back(poses_gt.at(i));
     }
@@ -641,7 +699,7 @@ void RosVisualizer::publish_groundtruth() {
     // Publish our transform on TF
     tf::StampedTransform trans;
     trans.stamp_ = ros::Time::now();
-    trans.frame_id_ = "vio_odom";
+    trans.frame_id_ = map_frame_id_;
     trans.child_frame_id_ = "truth";
     tf::Quaternion quat(state_gt(1,0),state_gt(2,0),state_gt(3,0),state_gt(4,0));
     trans.setRotation(quat);
@@ -759,7 +817,7 @@ void RosVisualizer::publish_keyframe_information() {
     // PUBLISH HISTORICAL POSE ESTIMATE
     nav_msgs::Odometry odometry_pose;
     odometry_pose.header = header;
-    odometry_pose.header.frame_id = "vio_odom";
+    odometry_pose.header.frame_id = map_frame_id_;
     odometry_pose.pose.pose.position.x = stateinG(4);
     odometry_pose.pose.pose.position.y = stateinG(5);
     odometry_pose.pose.pose.position.z = stateinG(6);
@@ -783,7 +841,7 @@ void RosVisualizer::publish_keyframe_information() {
     // Construct the message
     sensor_msgs::PointCloud point_cloud;
     point_cloud.header = header;
-    point_cloud.header.frame_id = "vio_odom";
+    point_cloud.header.frame_id = map_frame_id_;
     for(const auto &feattimes : hist_feat_timestamps) {
 
         // Skip if this feature has no extraction in the "zero" camera

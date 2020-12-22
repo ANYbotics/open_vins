@@ -8,12 +8,17 @@
 #include "VisualInertialOdometryRos.h"
 #include "ros_transport.h"
 
+#include <geometry_msgs/TransformStamped.h>
+#include <tf/transform_datatypes.h>
 #include <memory>
 #include <std_msgs/Empty.h>
+// kindr ros
+#include <kindr_ros/kindr_ros.hpp>
+
 
 namespace ov_msckf {
 
-VisualInertialOdometryRos::VisualInertialOdometryRos(ros::NodeHandle& nh, ros::NodeHandle& imageNh, ros::CallbackQueue& imageCallbackQueue): nh_(nh), imageNh_(imageNh) {
+VisualInertialOdometryRos::VisualInertialOdometryRos(ros::NodeHandle& nh, ros::NodeHandle& imageNh, ros::CallbackQueue& imageCallbackQueue): nh_(nh), imageNh_(imageNh), tf_listener_(tf_buffer_) {
     // Use a separate callback queue for images input so that the images have a less chance to be dropped out.
     imageNh_.setCallbackQueue(&imageCallbackQueue);
     // Read parameters from ROS parameter server.
@@ -21,6 +26,14 @@ VisualInertialOdometryRos::VisualInertialOdometryRos(ros::NodeHandle& nh, ros::N
     const bool success = read_vio_setup_parameters();
     if (!success){
         ROS_WARN("Cannot fetch ROS setup parameters. Will use the default values.");
+    }
+
+    T_RI_.setIdentity();
+    if (transform_imu_into_robot_frame_){
+        bool is_transform_obtained = get_kindr_rigid_body_transform_from_imu_to_robot_frame();
+        while(!is_transform_obtained){
+            is_transform_obtained = get_kindr_rigid_body_transform_from_imu_to_robot_frame();
+        }
     }
 
     ov_msckf::advertiseService(nh_, reset_server_, "reset", &VisualInertialOdometryRos::reset_callback, this);
@@ -44,6 +57,21 @@ VisualInertialOdometryRos::VisualInertialOdometryRos(ros::NodeHandle& nh, ros::N
     ov_msckf::advertise<std_msgs::Empty>(nh_, reset_notification_publisher_, "reset_notification");
 
     ROS_INFO("Finished setting up subscribers for the system.");
+}
+
+bool VisualInertialOdometryRos::get_kindr_rigid_body_transform_from_imu_to_robot_frame(){
+    geometry_msgs::TransformStamped imuToRobotTfMsg;
+    try{
+        imuToRobotTfMsg = tf_buffer_.lookupTransform(robot_frame_id_, imu_frame_id_, ros::Time(0), ros::Duration(tf_timeout_imu_robot_));
+    }
+    catch (tf2::TransformException &ex){
+        ROS_WARN_STREAM("Caught a tf exception while getting the TF transform from imu to robot: '" << ex.what() << "'.");
+        return false;
+    }
+    tf::StampedTransform imuToRobotTf;
+    tf::transformStampedMsgToTF(imuToRobotTfMsg, imuToRobotTf);
+    kindr_ros::convertFromRosTf(imuToRobotTf, T_RI_);
+    return true;
 }
 
 void VisualInertialOdometryRos::publish_reset_notification() const{
@@ -74,9 +102,17 @@ bool VisualInertialOdometryRos::reset_callback(std_srvs::Empty::Request & /*requ
 
 bool VisualInertialOdometryRos::read_vio_setup_parameters(){
     bool success = nh_.getParam("callback_switch_parameters/message_wait_time_out", message_wait_time_out_);
+
     success &= nh_.getParam("callback_switch_parameters/checking_frequency", checking_frequency_);
     success &= nh_.getParam("image_sync_time_diff_tolerance", image_sync_time_diff_tolerance_);
     success &= nh_.getParam("handle_sensor_failure", handle_sensor_failure_);
+    success &= nh_.getParam("tf_timeout_imu_robot", tf_timeout_imu_robot_);
+
+    // Read frame parameters
+    success &= nh_.getParam("coordinate_frames/imu", imu_frame_id_);
+    success &= nh_.getParam("coordinate_frames/robot", robot_frame_id_);
+    success &= nh_.getParam("transform_imu_into_robot_frame", transform_imu_into_robot_frame_);
+
     return success;
 }
 
@@ -206,7 +242,7 @@ void VisualInertialOdometryRos::callback_switch(){
 
             ROS_WARN_STREAM_ONCE("Cannot get image from topic " << param_io::param<std::string>(nh_, "subscribers/" + camera_input_0_ + "/topic", camera_input_0_) << ". Started monocular visual-inertial odometry.");
         }else{
-            ROS_WARN_STREAM_THROTTLE(3, "No image for visual-inertial odometry is currently available (throttled: 3s)");
+            ROS_WARN_STREAM_THROTTLE(3, "No camera image for visual-inertial odometry (throttled: 3s).");
         }
 
         // Disable or enable contact topics subscription when the system is initialized or uninitialized.
@@ -247,6 +283,7 @@ void VisualInertialOdometryRos::callback_switch(){
 void VisualInertialOdometryRos::callback_feet_contact(const signal_logger_msgs::UInt32Stamped::ConstPtr& msg0, const signal_logger_msgs::UInt32Stamped::ConstPtr& msg1,
                                                       const signal_logger_msgs::UInt32Stamped::ConstPtr& msg2, const signal_logger_msgs::UInt32Stamped::ConstPtr& msg3) {
     const double time = msg0->header.stamp.toSec();
+    ROS_DEBUG_THROTTLE(1, "The timestamp of the contact measurements to trigger the callback in ROS interface is: %f (throttled: 1s)", time);
     const auto is_in_contact_foot0 = msg0->value;
     const auto is_in_contact_foot1 = msg1->value;
     const auto is_in_contact_foot2 = msg2->value;
@@ -259,6 +296,7 @@ void VisualInertialOdometryRos::callback_feet_contact(const signal_logger_msgs::
 void VisualInertialOdometryRos::callback_inertial(const sensor_msgs::Imu::ConstPtr& msg) {
     // Convert the IMU message into a proper format.
     const double imu_msg_time = msg->header.stamp.toSec();
+    ROS_DEBUG_THROTTLE(1, "The timestamp of the IMU measurement to trigger the callback in ROS interface is: %f (throttled: 1s)", imu_msg_time);
     Eigen::Vector3d wm, am;
     wm << msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z;
     am << msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z;
