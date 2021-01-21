@@ -312,4 +312,12 @@ if(CATKIN_ENABLE_TESTING)
   endif(cmake_code_coverage_FOUND)
 endif()
 
-
+#################
+## Clang_tools ##
+#################
+find_package(cmake_clang_tools QUIET)
+if(cmake_clang_tools_FOUND)
+  add_default_clang_tooling(
+    DISABLE_CLANG_FORMAT
+  )
+endif(cmake_clang_tools_FOUND)
